@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                                                      │ ▾ SESSION                  1/1 · ✓0 ✗1
+ Go               ────────   0% │ Go › Slices                                                                    ○ new │ ✗ Slices                            Go
+  ▸ ○ Slices                    │ What does this print?                                                                │
+                                │  1  s := make([]int, 2, 5)                                                           │ ▾ LAST 5 ANSWERS
+                                │  2  fmt.Println(len(s), cap(s))                                                      │ ✗   0 of 1
+                                │                                                                                      │ Mastery needs 4 of the last 5 correct,
+                                │ ┌─ ✗ Not quite ──────────────────────────────────── graded again · due Wed 11 Nov ─┐ │ over at least 2 days.
+                                │ │                                                                                  │ │
+                                │ │ - 5 5  your answer                                    make-len-is-cap · 1st time │ │ ▾ SCHEDULE              before → after
+                                │ │ + 2 5  expected                                                                  │ │ next due                  new → Wed 11
+                                │ │                                                                                  │ │ lapses                           0 → 0
+                                │ │ Why not                                                                          │ │ make-len-is-cap          1× in 30 days
+                                │ │   The second argument is the length; the third is the capacity.                  │ │
+                                │ │                                                                                  │ │ ▾ TUTOR                         via pi
+                                │ │ Why this                                                                         │ │ e  explain deeper
+                                │ │   make([]T, len, cap).                                                           │ │ Sends the question, your answer and
+                                │ │                                                                                  │ │ the expected one. Everything else
+                                │ │ Takeaway                                                                         │ │ works without it.
+                                │ │   A view over an array with length and capacity.                                 │ │
+                                │ │                                                                                  │ │
+                                │ │   enter  finish session     e  ask the tutor                                     │ │
+                                │ │                                                                                  │ │
+                                │ └──────────────────────────────────────────────────────────────────────────────────┘ │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+ ────────────────────────────── │                                                                                      │
+ ● █ mastered  ◑ ▓ review       │                                                                                      │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                                                      │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                                                             session [✗] 1/1 ✓0 ✗1 │ streak 1d │ Tue 10 Nov
+ go.slices.output-len · output · answered in 0:00                                                  enter next · e ask the tutor · 1-4 screens · ? help · q quit

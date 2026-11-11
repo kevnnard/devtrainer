@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                        │ ▾ SESSION                1/1
+ Logic            ────────   0% │                                                        │ ▸ Recursion            Logic
+  ▸ ○ Recursion                 │ ┌─ Logic › Recursion ──────────────────────── ○ new ─┐ │
+                                │ │                                                    │ │ ▾ CONCEPT       intermediate
+                                │ │ Order the lines of a recursive factorial.          │ │ A function that calls itself
+                                │ │                                                    │ │ on a smaller input.
+                                │ │ Selected line 4 of 6 · 3 lines moved so far        │ │
+                                │ │  1      return n * fact(n-1)              was 2    │ │ ▾ IF YOU ANSWER     next due
+                                │ │  2      }                                 was 3    │ │ ✗ Again wrong     Wed 11 Nov
+                                │ │  3          return 1                      was 1    │ │ ◆ Hard  hint/slow Thu 12 Nov
+                                │ │   ▸ 4  func fact(n int) int {                      │ │ ✓ Good  correct   Fri 13 Nov
+                                │ │  5  }                                              │ │ ▲ Easy  fast      Thu 26 Nov
+                                │ │  6      if n <= 1 {                                │ │
+                                │ │                                                    │ │
+                                │ │ J/K moves the lifted line · enter checks the order │ │
+                                │ │                                                    │ │
+                                │ └────────────────────────────────────────────────────┘ │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+ ────────────────────────────── │                                                        │
+ ● █ mastered  ◑ ▓ review       │                                                        │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                        │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                     session [●] 1/1 ✓0 ✗0 │ streak 0d │ Tue 10 Nov
+ logic.recursion.parsons-fact · parsons                     j/k select · J/K move line · enter submit · h hint · ? help

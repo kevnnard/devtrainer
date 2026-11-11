@@ -1,0 +1,24 @@
+
+  Git › Commits                                                          ○ new
+  ┌─ ✗ Not quite ──────────────────────────── graded again · due Wed 11 Nov ─┐
+  │                                                                          │
+  │ - Every change in the working tree  your answer                          │
+  │   commit-takes-worktree · 1st time                                       │
+  │ + The staged changes  expected                                           │
+  │                                                                          │
+  │ Why not                                                                  │
+  │   Only staged changes are committed; unstaged edits stay in the working  │
+  │   tree.                                                                  │
+  │                                                                          │
+  │ Why this                                                                 │
+  │   A commit is a snapshot of the index.                                   │
+  │                                                                          │
+  │ Takeaway                                                                 │
+  │   A commit records the staged snapshot.                                  │
+  │                                                                          │
+  │   enter  finish session     e  ask the tutor                             │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+ devtrainer │ 1 Home   2 Study   3 Tracks  4 Stats                [✗] 1/1 ✓0 ✗1
+                   enter next · e ask the tutor · 1-4 screens · ? help · q quit

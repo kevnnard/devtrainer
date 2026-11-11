@@ -1,0 +1,823 @@
+track:
+  id: go
+  title: Go
+  description: Modern Go (1.22+) — zero values, slices, errors, interfaces, generics and concurrency.
+  order: 40
+
+concepts:
+  - id: go.basics
+    title: Declarations and zero values
+    summary: >
+      Every Go variable starts at its type's zero value (0, "", false, nil).
+      := declares inside functions only; nil slices are usable, nil maps are
+      read-only.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: In Go every variable starts at its type's zero value. There is no uninitialized memory.
+      example:
+        lang: go
+        code: |
+          var count int
+          var name string
+          var ok bool
+          var ids []int
+          fmt.Println(count, name == "", ok, ids == nil, len(ids))
+          ids = append(ids, 7)
+          fmt.Println(ids)
+      steps:
+        - text: 'var declares a variable with its type and no value, so it gets the zero value: 0 for numbers, "" for strings, false for bool.'
+        - text: The zero value of a slice is nil, and len of a nil slice is 0. The first line prints 0 true false true 0.
+          predict:
+            prompt: What is ids before the append?
+            options:
+              - text: An error, because it was never made
+                explanation: Reading a nil slice is safe; len is 0 and range does nothing.
+              - text: A slice holding one 0
+                explanation: The zero value of a slice has no elements at all.
+              - text: nil, with length 0
+                correct: true
+        - text: append allocates a backing array when it needs one and returns the new slice, so the program prints [7]. Always assign the result of append.
+          predict:
+            prompt: What does append(ids, 7) do on the nil slice?
+            options:
+              - text: Panics on the nil slice
+                explanation: append handles nil slices; it is writing to a nil map that panics.
+              - text: Allocates and returns [7]
+                correct: true
+        - text: "Inside a function, x := 1 declares and assigns in one go. At package level you must write var x = 1."
+      takeaway: 'Every Go variable starts at its zero value (0, "", false, nil); a nil slice is ready to append to.'
+    items:
+      - id: go.basics.output-zero-values
+        type: output
+        prompt: What does this program print?
+        code: |
+          package main
+
+          import "fmt"
+
+          func main() {
+              var s []int
+              var m map[string]int
+              fmt.Println(s == nil, len(s), m["x"])
+          }
+        answers: ["true 0 0"]
+        explanation: A declared slice is nil with length 0; reading a missing key from a map — even a nil map — returns the value type's zero value.
+        hint: Reading from a nil map is allowed.
+
+      - id: go.basics.mcq-package-level
+        type: mcq
+        prompt: Which declaration is valid at package level (outside any function)?
+        options:
+          - text: "var retries = 3"
+            correct: true
+            explanation: var (and const) declarations work everywhere.
+          - text: "retries := 3"
+            misconception: short-decl-anywhere
+            explanation: Short variable declarations are only allowed inside function bodies.
+          - text: "let retries = 3"
+            misconception: js-syntax-in-go
+            explanation: Go has no let keyword.
+        explanation: Every top-level statement in Go must start with a keyword (var, const, func, type, import).
+        hint: Top-level Go code starts with a keyword.
+
+      - id: go.basics.bug-nil-map
+        type: bug
+        prompt: count panics with "assignment to entry in nil map". Which line must change?
+        code: |
+          func count(words []string) map[string]int {
+              var m map[string]int
+              for _, w := range words {
+                  m[w]++
+              }
+              return m
+          }
+        bug_line: 2
+        explanation: var m map[string]int leaves m nil; writes panic. Initialize it with `m := make(map[string]int)` or `map[string]int{}`.
+        hint: Which line creates the map?
+
+      - id: go.basics.parsons-hello
+        type: parsons
+        prompt: Order the lines of a minimal Go program.
+        lines:
+          - "package main"
+          - "import \"fmt\""
+          - "func main() {"
+          - "    fmt.Println(\"hello\")"
+          - "}"
+        explanation: The package clause comes first, then imports, then declarations; execution starts at main.main.
+        hint: What must every Go file start with?
+
+      - id: go.basics.code-zero-count
+        type: code
+        language: go
+        prompt: Count how many times each word appears and print the map.
+        starter: |
+          package main
+
+          import "fmt"
+
+          func main() {
+              words := []string{"go", "is", "fun", "go"}
+              counts := map[string]int{}
+              for _, w := range words {
+                  if _, ok := counts[w]; ok {
+                      counts[w]++
+                  }
+              }
+              fmt.Println(counts)
+          }
+        solution: |
+          package main
+
+          import "fmt"
+
+          func main() {
+              words := []string{"go", "is", "fun", "go"}
+              counts := map[string]int{}
+              for _, w := range words {
+                  counts[w]++
+              }
+              fmt.Println(counts)
+          }
+        expected: |
+          map[fun:1 go:2 is:1]
+        explanation: Reading a missing key returns the zero value 0, so counts[w]++ works on the first sighting too. The starter only increments keys that already exist, and none ever do. fmt prints maps with sorted keys.
+        hint: What does counts["new"] return before anything was stored?
+
+  - id: go.slices
+    title: Slices and loop variables
+    summary: >
+      A slice is a view (pointer, length, capacity) over an array; append
+      writes in place when capacity allows. Since Go 1.22 each loop iteration
+      has its own variable.
+    level: intermediate
+    prereqs: [go.basics]
+    lesson:
+      intro: "A slice is a small header (pointer, length, capacity) over a backing array. Slicing shares the array; append writes into it while capacity lasts."
+      example:
+        lang: go
+        code: |
+          a := []int{1, 2, 3, 4}
+          b := a[1:3]
+          fmt.Println(b, len(b), cap(b))
+          b[0] = 20
+          b = append(b, 40)
+          fmt.Println(a)
+          b = append(b, 50, 60)
+          b[0] = 0
+          fmt.Println(a, b)
+      steps:
+        - text: b := a[1:3] copies no elements. b starts at a[1], has length 2, and its capacity runs to the end of a's array, 3. The first line prints [2 3] 2 3, and b[0] = 20 writes a[1].
+        - text: b has length 2 but capacity 3, so append stores 40 in the next slot of the shared array, which is a[3]. a's own length stays 4.
+          predict:
+            prompt: After b = append(b, 40), what does fmt.Println(a) print?
+            options:
+              - text: "[1 20 3 40]"
+                correct: true
+              - text: "[1 20 3 4]"
+                explanation: Capacity was left, so append wrote into the shared array instead of copying.
+              - text: "[1 20 3 4 40]"
+                explanation: append never changes a's length; it returns a new header for b.
+        - text: Appending 50 and 60 needs 5 slots but b's capacity is 3, so append allocates a bigger array, copies, and returns a slice over it. From then on b and a are independent, and b[0] = 0 leaves a alone.
+          predict:
+            prompt: Does b[0] = 0 after the second append change a?
+            options:
+              - text: Yes, they still share an array
+                explanation: The second append exceeded the capacity and moved b to a new array.
+              - text: No, b now has its own array
+                correct: true
+        - text: "Always use append's result. Preallocate with make([]T, length, capacity), for example make([]T, 0, n) and then append. For an independent copy use slices.Clone, or cap the capacity with a full slice expression a[1:3:3]."
+        - text: Since Go 1.22 (go directive 1.22 or later in go.mod) every iteration of a for loop has its own loop variable, so closures and goroutines that capture i see that iteration's value. Before, all iterations shared one variable.
+      takeaway: Slices share their backing array until append runs out of capacity; always keep append's result.
+    items:
+      - id: go.slices.output-shared-backing
+        type: output
+        prompt: "What does this print? (inside main, fmt imported)"
+        code: |
+          a := []int{1, 2, 3}
+          b := a[:2]
+          b = append(b, 99)
+          fmt.Println(a)
+        options:
+          - text: "[1 2 99]"
+            correct: true
+            explanation: b has length 2 but capacity 3, so append writes into a's backing array at index 2.
+          - text: "[1 2 3]"
+            misconception: slice-is-copy
+            explanation: Re-slicing does not copy; a and b share the same array.
+          - text: "[1 2 3 99]"
+            misconception: append-modifies-original-len
+            explanation: append never changes a's length; it only returns a new slice header.
+        explanation: To make an independent copy use slices.Clone(a[:2]) or a full slice expression a[:2:2] to cap the capacity.
+        hint: What is cap(b)?
+
+      - id: go.slices.output-loopvar
+        type: output
+        prompt: "In a module with go 1.22 or later, what does this print?"
+        code: |
+          var fs []func()
+          for i := 0; i < 3; i++ {
+              fs = append(fs, func() { fmt.Print(i) })
+          }
+          for _, f := range fs {
+              f()
+          }
+        options:
+          - text: "012"
+            correct: true
+            explanation: Since Go 1.22 each iteration declares a fresh i, so each closure captures its own value.
+          - text: "333"
+            misconception: loopvar-shared
+            explanation: That was the behavior before Go 1.22, when all iterations shared one variable.
+          - text: "0 1 2"
+            misconception: print-adds-spaces
+            explanation: fmt.Print adds spaces only between operands, and each call here has one operand.
+        explanation: The go directive in go.mod decides which loop semantics apply.
+        hint: Check the Go version in the prompt.
+
+      - id: go.slices.cloze-make-cap
+        type: cloze
+        prompt: "Preallocate a slice with length 0 and room for n elements, then append to it."
+        code: |
+          out := make([]string, ___, ___)
+          for _, u := range users {
+              out = append(out, u.Name)
+          }
+        answers: ["0 | n", "0 | len(users)"]
+        explanation: make([]T, len, cap). Length 0 makes append start at index 0; capacity n avoids repeated reallocations.
+        hint: The first number is the length, the second the capacity.
+
+      - id: go.slices.code-append-alias
+        type: code
+        language: go
+        prompt: a and b both extend base by one element. Make them independent so it prints [0 0 0 1] [0 0 0 2].
+        starter: |
+          package main
+
+          import "fmt"
+
+          func main() {
+              base := make([]int, 3, 10)
+              a := append(base, 1)
+              b := append(base, 2)
+              fmt.Println(a, b)
+          }
+        solution: |
+          package main
+
+          import "fmt"
+
+          func main() {
+              base := make([]int, 3, 10)
+              base = base[:len(base):len(base)]
+              a := append(base, 1)
+              b := append(base, 2)
+              fmt.Println(a, b)
+          }
+        expected: |
+          [0 0 0 1] [0 0 0 2]
+        explanation: "base has room for 10, so both appends write index 3 of the same backing array and the second overwrites the first: [0 0 0 2] [0 0 0 2]. The full slice expression base[:3:3] caps the capacity at the length, so each append must allocate its own array (slices.Clone works too)."
+        hint: Compare len(base) and cap(base).
+
+  - id: go.errors
+    title: Errors
+    summary: >
+      Errors are values. Wrap with fmt.Errorf("...: %w", err) to add context
+      and inspect chains with errors.Is / errors.As instead of ==.
+    level: intermediate
+    prereqs: [go.basics]
+    lesson:
+      intro: In Go an error is a value. Wrapping adds context while keeping the original error reachable, and errors.Is and errors.As search the chain.
+      example:
+        lang: go
+        code: |
+          var ErrNoStock = errors.New("no stock")
+
+          type LimitErr struct{ Max int }
+
+          func (e *LimitErr) Error() string {
+              return fmt.Sprintf("limit %d", e.Max)
+          }
+
+          func main() {
+              err := fmt.Errorf("pay: %w", &LimitErr{3})
+              var le *LimitErr
+              fmt.Println(err)
+              fmt.Println(errors.As(err, &le), le.Max)
+              fmt.Println(errors.Is(err, ErrNoStock))
+          }
+      steps:
+        - text: Any type with an Error() string method is an error. ErrNoStock is a sentinel, a fixed value compared by identity. LimitErr is a custom type that carries data.
+        - text: "fmt.Errorf with %w builds a new error whose message is pay: limit 3 and whose Unwrap returns the LimitErr. With %v you would get the same text but lose the original error."
+          predict:
+            prompt: With %v instead of %w, would errors.As still find the *LimitErr?
+            options:
+              - text: Yes, the text is the same
+                explanation: errors.As follows Unwrap, and %v only copies the message, so there is nothing to unwrap.
+              - text: Only if the message contains "limit"
+                explanation: errors.As matches types along the chain, never message text.
+              - text: No, the chain is gone
+                correct: true
+        - text: errors.As walks the chain and stores the first error of the target's type in le, so it prints true 3. errors.Is walks the chain comparing values; ErrNoStock is not in it, so false.
+        - text: "== compares only the outermost value. A wrapper is a new value, so fmt.Errorf(\"x: %w\", ErrNoStock) == ErrNoStock is false, while errors.Is finds it."
+          predict:
+            prompt: "w := fmt.Errorf(\"x: %w\", ErrNoStock). What does w == ErrNoStock give?"
+            options:
+              - text: "false"
+                correct: true
+              - text: "true"
+                explanation: w is a new wrapper value; only errors.Is looks inside it.
+        - text: "An interface value is nil only when both its type and value are nil. Returning a nil *LimitErr as an error gives a non-nil error with type *LimitErr; return the literal nil instead."
+      takeaway: "Wrap with %w; check sentinels with errors.Is and types with errors.As, never with ==."
+    items:
+      - id: go.errors.output-wrap
+        type: output
+        prompt: What does this program print?
+        code: |
+          package main
+
+          import (
+              "errors"
+              "fmt"
+          )
+
+          var ErrNotFound = errors.New("not found")
+
+          func main() {
+              err := fmt.Errorf("load user: %w", ErrNotFound)
+              fmt.Println(err == ErrNotFound, errors.Is(err, ErrNotFound))
+              fmt.Println(err)
+          }
+        answers: ["false true\nload user: not found"]
+        explanation: The wrapper is a new error value, so == is false; errors.Is walks the Unwrap chain and finds ErrNotFound. The message is the format string with the wrapped error's text.
+        hint: "%w keeps the original error reachable."
+
+      - id: go.errors.cloze-wrap-verb
+        type: cloze
+        prompt: "Add context to err while keeping it inspectable with errors.Is: return fmt.Errorf(\"open config: ___\", err)"
+        answers: ["%w"]
+        case_sensitive: true
+        explanation: "%w wraps the error (Unwrap returns it); %v would only copy its text and break errors.Is/As."
+        hint: The verb's letter stands for wrap.
+
+      - id: go.errors.bug-typed-nil
+        type: bug
+        prompt: "run returns no real error, yet the program prints \"failed\". Which line is the cause?"
+        code: |
+          type MyErr struct{}
+          func (*MyErr) Error() string { return "boom" }
+          func run() error {
+              var p *MyErr
+              return p
+          }
+          func main() {
+              if err := run(); err != nil {
+                  fmt.Println("failed")
+              }
+          }
+        bug_line: 5
+        explanation: An interface is nil only if both its type and value are nil. Returning a nil *MyErr produces an error interface with type *MyErr, which is != nil. Return the literal nil instead.
+        hint: An interface value has two parts.
+
+      - id: go.errors.mcq-errors-as
+        type: mcq
+        prompt: You need the Path field of a *fs.PathError somewhere inside a wrapped error chain. What do you use?
+        options:
+          - text: "var pe *fs.PathError; if errors.As(err, &pe) { use(pe.Path) }"
+            correct: true
+            explanation: errors.As walks the chain and assigns the first error matching the target's type.
+          - text: "pe := err.(*fs.PathError)"
+            misconception: type-assert-wrapped
+            explanation: A type assertion checks only the outermost error; it panics (or fails with the ok form) when the PathError is wrapped.
+          - text: "errors.Is(err, fs.PathError{})"
+            misconception: is-for-types
+            explanation: errors.Is compares against a specific value (sentinel); matching by type is the job of errors.As.
+        explanation: Is → "is it this sentinel?"; As → "is there an error of this type, and give it to me".
+        hint: One function compares values, the other extracts types.
+
+      - id: go.errors.code-wrap-is
+        type: code
+        language: go
+        prompt: find adds context to ErrNotFound. Keep the message and make errors.Is still recognise it.
+        starter: |
+          package main
+
+          import (
+              "errors"
+              "fmt"
+          )
+
+          var ErrNotFound = errors.New("not found")
+
+          func find(id int) error {
+              return fmt.Errorf("find user %d: %v", id, ErrNotFound)
+          }
+
+          func main() {
+              err := find(7)
+              fmt.Println(err)
+              fmt.Println(errors.Is(err, ErrNotFound))
+          }
+        solution: |
+          package main
+
+          import (
+              "errors"
+              "fmt"
+          )
+
+          var ErrNotFound = errors.New("not found")
+
+          func find(id int) error {
+              return fmt.Errorf("find user %d: %w", id, ErrNotFound)
+          }
+
+          func main() {
+              err := find(7)
+              fmt.Println(err)
+              fmt.Println(errors.Is(err, ErrNotFound))
+          }
+        expected: |
+          find user 7: not found
+          true
+        explanation: "%v only formats the text, so the new error has no link to ErrNotFound and errors.Is reports false. %w formats the same text and also wraps the original, so errors.Is walks the chain and finds it."
+        hint: One verb formats, the other formats and wraps.
+
+  - id: go.interfaces-generics
+    title: Interfaces and generics
+    summary: >
+      Interfaces are satisfied implicitly by method sets. Generics (Go 1.18+)
+      add type parameters constrained by interfaces such as any, comparable
+      or cmp.Ordered.
+    level: intermediate
+    prereqs: [go.errors]
+    lesson:
+      intro: Go interfaces are satisfied implicitly, by having the right methods. Generics add type parameters whose constraints are interfaces too.
+      example:
+        lang: go
+        code: |
+          type Shape interface{ Area() float64 }
+          type Sq struct{ S float64 }
+          func (q Sq) Area() float64 {
+              return q.S * q.S
+          }
+
+          func Max[T cmp.Ordered](xs ...T) T {
+              m := xs[0]
+              for _, x := range xs[1:] {
+                  if x > m {
+                      m = x
+                  }
+              }
+              return m
+          }
+      steps:
+        - text: Sq never mentions Shape. It has the method Area() float64, and that is enough. To check it at compile time, write var _ Shape = Sq{}.
+          predict:
+            prompt: What makes Sq a Shape?
+            options:
+              - text: Its Area() float64 method
+                correct: true
+              - text: An implements clause on the type
+                explanation: Go has no implements keyword; satisfaction is structural.
+              - text: Embedding Shape in the struct
+                explanation: Embedding an interface compiles but provides no real method; calling it panics.
+        - text: Max has a type parameter T constrained by cmp.Ordered, the types that support < and >. Integers, floats and strings qualify, and so do named types like type Celsius float64, because the constraint uses ~float64.
+        - text: The compiler infers T from the arguments. Max(2, 9, 4) uses int and returns 9; Max("b", "a") uses string and returns "b".
+        - text: "Constraints from loose to strict: any (an alias for interface{}) allows every type but no operators; comparable allows == and !=; cmp.Ordered adds < <= > >=. Structs can be comparable but are never ordered, and slices are not even comparable."
+          predict:
+            prompt: Does Max compile when called with two struct{ X int } values?
+            options:
+              - text: Yes, structs support ==
+                explanation: == makes them comparable, but Max needs <, which structs do not have.
+              - text: No, structs are not ordered
+                correct: true
+      takeaway: Methods satisfy interfaces implicitly; constraints are any, comparable or cmp.Ordered depending on the operators you need.
+    items:
+      - id: go.interfaces-generics.mcq-implicit
+        type: mcq
+        prompt: How does a type declare that it implements io.Writer?
+        options:
+          - text: It doesn't — any type with a method Write([]byte) (int, error) satisfies io.Writer automatically
+            correct: true
+            explanation: Go interfaces are structural; satisfaction is checked where the value is used.
+          - text: "type File struct{} implements io.Writer"
+            misconception: explicit-implements
+            explanation: Go has no implements keyword.
+          - text: By embedding io.Writer in the struct
+            misconception: embed-to-implement
+            explanation: Embedding an interface field compiles but panics on nil; it is not how you implement one.
+        explanation: "To assert at compile time, write `var _ io.Writer = (*File)(nil)`."
+        hint: Go interfaces are structural.
+
+      - id: go.interfaces-generics.output-sum
+        type: output
+        prompt: What does this program print?
+        code: |
+          package main
+
+          import "fmt"
+
+          func Sum[T int | float64](xs ...T) T {
+              var total T
+              for _, x := range xs {
+                  total += x
+              }
+              return total
+          }
+
+          func main() { fmt.Println(Sum(1, 2, 3), Sum(1.5, 2.5)) }
+        answers: ["6 4"]
+        explanation: T is inferred as int for the first call and float64 for the second; fmt prints the float64 4.0 as 4.
+        hint: Println prints a whole float without a decimal point.
+
+      - id: go.interfaces-generics.cloze-any
+        type: cloze
+        prompt: "Complete the constraint so Map accepts slices of any element type."
+        code: |
+          func Map[T, U ___](xs []T, f func(T) U) []U {
+              out := make([]U, 0, len(xs))
+              for _, x := range xs {
+                  out = append(out, f(x))
+              }
+              return out
+          }
+        answers: ["any", "interface{}"]
+        explanation: any is an alias for interface{} and allows every type; use comparable for == and cmp.Ordered for < >.
+        hint: The alias for the empty interface.
+
+      - id: go.interfaces-generics.multi-ordered
+        type: multi
+        prompt: Which types satisfy cmp.Ordered (usable with slices.Sort and <)?
+        options:
+          - text: int
+            correct: true
+            explanation: All integer types are ordered.
+          - text: string
+            correct: true
+            explanation: Strings compare lexicographically by bytes.
+          - text: "type Celsius float64"
+            correct: true
+            explanation: cmp.Ordered uses ~float64, so named types with that underlying type qualify.
+          - text: "[]byte"
+            misconception: slices-are-comparable
+            explanation: Slices do not even support ==; use bytes.Compare.
+          - text: "struct{ X int }"
+            misconception: comparable-means-ordered
+            explanation: Structs can be comparable (==) but are never ordered (<).
+        explanation: comparable ⊃ ordered — comparable allows ==, Ordered allows < as well.
+        hint: Can you write a < b for that type?
+
+      - id: go.interfaces-generics.code-generic-max
+        type: code
+        language: go
+        prompt: Max returns the largest element of a non-empty slice of any ordered type. Fix it so it prints -1 pear.
+        starter: |
+          package main
+
+          import (
+              "cmp"
+              "fmt"
+          )
+
+          func Max[T cmp.Ordered](xs []T) T {
+              var best T
+              for _, x := range xs {
+                  if x > best {
+                      best = x
+                  }
+              }
+              return best
+          }
+
+          func main() {
+              fmt.Println(Max([]int{-3, -1, -7}), Max([]string{"kiwi", "apple", "pear"}))
+          }
+        solution: |
+          package main
+
+          import (
+              "cmp"
+              "fmt"
+          )
+
+          func Max[T cmp.Ordered](xs []T) T {
+              best := xs[0]
+              for _, x := range xs[1:] {
+                  if x > best {
+                      best = x
+                  }
+              }
+              return best
+          }
+
+          func main() {
+              fmt.Println(Max([]int{-3, -1, -7}), Max([]string{"kiwi", "apple", "pear"}))
+          }
+        expected: |
+          -1 pear
+        explanation: "var best T is T's zero value: 0 for int, \"\" for string. 0 is larger than every negative number, so the starter prints 0. Starting from the first element works for every ordered type; cmp.Ordered is what allows > on T."
+        hint: What is the zero value of T when T is int?
+
+  - id: go.concurrency
+    title: Concurrency
+    summary: >
+      Goroutines are cheap; channels communicate and synchronize; sync.WaitGroup
+      waits; context cancels. Unsynchronized shared memory is a data race.
+    level: advanced
+    prereqs: [go.interfaces-generics, linux.processes]
+    lesson:
+      intro: Goroutines run functions concurrently. Channels pass values between them, a WaitGroup waits for them, and close tells a receiver no more values are coming.
+      example:
+        lang: go
+        code: |
+          results := make(chan int)
+          var wg sync.WaitGroup
+          for i := range 3 {
+              wg.Add(1)
+              go func() {
+                  defer wg.Done()
+                  results <- i * i
+              }()
+          }
+          go func() { wg.Wait(); close(results) }()
+          sum := 0
+          for r := range results {
+              sum += r
+          }
+          fmt.Println(sum)
+      steps:
+        - text: go starts a goroutine, which is cheap. range 3 (Go 1.22+) gives i = 0, 1, 2, and each iteration has its own i, so the goroutines send 0, 1 and 4.
+        - text: wg.Add(1) runs in the loop, before go. If it ran inside the goroutine, Wait could see a counter of 0 and return before any work started. Done decrements; Wait blocks until the counter is 0.
+          predict:
+            prompt: Why is wg.Add(1) called before go and not inside the goroutine?
+            options:
+              - text: It is only a style rule
+                explanation: It is about ordering; Add inside the goroutine can run after Wait.
+              - text: Add panics inside a goroutine
+                explanation: Add works anywhere; the danger is Wait running first.
+              - text: So Wait never sees the counter at 0 too early
+                correct: true
+        - text: An unbuffered send blocks until someone receives. main receives in the range loop; a helper goroutine closes results after every sender is done, so the range ends and 5 is printed. Only the sending side should close.
+          predict:
+            prompt: If nothing ever closed results, what would happen after the three values?
+            options:
+              - text: "range would wait forever: the runtime reports a deadlock"
+                correct: true
+              - text: range would stop by itself
+                explanation: range over a channel stops only when the channel is closed and drained.
+        - text: After close, buffered values can still be received. Then every receive returns the zero value at once, and v, ok := <-ch reports ok == false.
+        - text: Goroutines that write shared memory without synchronization are a data race; even counter++ is a separate load, add and store. Use a sync.Mutex, sync/atomic, or one owner goroutine fed by a channel, and check with go test -race.
+      takeaway: Add before go, close from the sender, range until closed, and synchronize every shared write.
+    items:
+      - id: go.concurrency.output-closed-channel
+        type: output
+        prompt: "What does this print? (inside main, fmt imported)"
+        code: |
+          ch := make(chan int, 3)
+          ch <- 1
+          ch <- 2
+          close(ch)
+          for v := range ch {
+              fmt.Print(v, " ")
+          }
+          v, ok := <-ch
+          fmt.Println(v, ok)
+        answers: ["1 2 0 false"]
+        explanation: Buffered values remain readable after close; range stops once the buffer is drained. Receiving from a closed, empty channel returns the zero value and ok=false.
+        hint: Closing does not discard buffered values.
+
+      - id: go.concurrency.bug-waitgroup-add
+        type: bug
+        prompt: wg.Wait sometimes returns before the work is done. Which line is wrong?
+        code: |
+          var wg sync.WaitGroup
+          for i := 0; i < 3; i++ {
+              go func() {
+                  wg.Add(1)
+                  defer wg.Done()
+                  work(i)
+              }()
+          }
+          wg.Wait()
+        bug_line: 4
+        explanation: Add must happen before starting the goroutine; otherwise Wait can run while the counter is still 0. Call wg.Add(1) before `go`, or use wg.Go(func(){...}) (Go 1.25+).
+        hint: Is the counter incremented before Wait can observe it?
+
+      - id: go.concurrency.mcq-data-race
+        type: mcq
+        prompt: Two goroutines each run `counter++` 1000 times on a shared int without synchronization, and main waits for both. What is guaranteed about counter?
+        options:
+          - text: Nothing — it is a data race; the result may be less than 2000 and go test -race reports it
+            correct: true
+            explanation: counter++ is read-modify-write; concurrent increments can overwrite each other.
+          - text: Exactly 2000, because ++ is atomic
+            misconception: increment-is-atomic
+            explanation: ++ compiles to separate load, add and store; use sync/atomic or a mutex.
+          - text: Exactly 1000, because the goroutines take turns
+            misconception: goroutines-take-turns
+            explanation: The scheduler gives no such ordering; the result is unpredictable.
+        explanation: Protect it with sync.Mutex, use atomic.Int64, or give ownership to one goroutine via a channel.
+        hint: Is counter++ a single machine operation?
+
+      - id: go.concurrency.parsons-producer
+        type: parsons
+        prompt: Order the lines so a goroutine produces 0..2 on a channel and main consumes them without deadlocking.
+        lines:
+          - "jobs := make(chan int)"
+          - "go func() {"
+          - "    for i := range 3 {"
+          - "        jobs <- i"
+          - "    }"
+          - "    close(jobs)"
+          - "}()"
+          - "for j := range jobs {"
+          - "    fmt.Println(j)"
+          - "}"
+        explanation: The producer must run in its own goroutine (an unbuffered send blocks until received) and close the channel when done so the consumer's range ends.
+        hint: Who closes the channel, and when?
+
+      - id: go.concurrency.code-pipeline-range
+        type: code
+        language: go
+        prompt: "A pipeline gen -> square sums the squares of 1, 2, 3 and 4. Fix the square stage so every value flows through and it prints 30."
+        starter: |
+          package main
+
+          import "fmt"
+
+          func gen(nums ...int) <-chan int {
+              out := make(chan int)
+              go func() {
+                  defer close(out)
+                  for _, n := range nums {
+                      out <- n
+                  }
+              }()
+              return out
+          }
+
+          func square(in <-chan int) <-chan int {
+              out := make(chan int)
+              go func() {
+                  defer close(out)
+                  n := <-in
+                  out <- n * n
+              }()
+              return out
+          }
+
+          func main() {
+              sum := 0
+              for v := range square(gen(1, 2, 3, 4)) {
+                  sum += v
+              }
+              fmt.Println(sum)
+          }
+        solution: |
+          package main
+
+          import "fmt"
+
+          func gen(nums ...int) <-chan int {
+              out := make(chan int)
+              go func() {
+                  defer close(out)
+                  for _, n := range nums {
+                      out <- n
+                  }
+              }()
+              return out
+          }
+
+          func square(in <-chan int) <-chan int {
+              out := make(chan int)
+              go func() {
+                  defer close(out)
+                  for n := range in {
+                      out <- n * n
+                  }
+              }()
+              return out
+          }
+
+          func main() {
+              sum := 0
+              for v := range square(gen(1, 2, 3, 4)) {
+                  sum += v
+              }
+              fmt.Println(sum)
+          }
+        expected: |
+          30
+        explanation: The starter's square receives one value, sends 1 and closes its output, so main's range ends after one value (gen's goroutine is left blocked). for n := range in keeps receiving until gen closes its channel, and only then does square close its own.
+        hint: How does a stage know its input has no more values?
+
+sections:
+  - id: go/foundations
+    title: Foundations
+    concepts: [go.basics, go.slices, go.errors]
+  - id: go/abstractions-concurrency
+    title: Abstractions & concurrency
+    concepts: [go.interfaces-generics, go.concurrency]

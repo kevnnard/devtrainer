@@ -1,0 +1,29 @@
+# Local Pi runtime state
+.atl/
+.pi/
+# Backups of removed workspaces
+.backup/
+# Build output
+/devtrainer
+.codegraph/
+
+# Agent plans, mockups and local orchestration (never part of public releases)
+/odd/
+/design/
+/designs/
+/.agents/
+/.claude/
+/.codex/
+/AGENTS.md
+/CLAUDE.md
+
+# Release scratch checkouts, generated drafts and local study data
+/.release/
+/drafts/
+*.db
+*.db-wal
+*.db-shm
+
+# Python test/tool caches
+__pycache__/
+*.py[cod]

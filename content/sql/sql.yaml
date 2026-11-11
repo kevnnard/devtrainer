@@ -1,0 +1,713 @@
+track:
+  id: sql
+  title: SQL
+  description: Relational queries from SELECT to joins, aggregation, indexes and transactions (PostgreSQL dialect).
+  order: 80
+
+concepts:
+  - id: sql.select-basics
+    title: SELECT, WHERE and NULL
+    summary: >
+      A query is evaluated FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER
+      BY → LIMIT. NULL means unknown: compare it with IS NULL, and aggregates
+      skip it.
+    level: beginner
+    lesson:
+      intro: "SQL clauses run in a fixed order, not the order you write them: FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT."
+      example:
+        lang: sql
+        code: |
+          SELECT name, price * qty AS total
+          FROM orders
+          WHERE coupon IS NULL
+            AND price * qty > 100
+          ORDER BY total DESC
+          LIMIT 3;
+      steps:
+        - text: FROM runs first and picks the rows of orders to work on.
+        - text: WHERE filters rows before SELECT computes total, so standard SQL (and PostgreSQL) needs the expression repeated. ORDER BY runs after SELECT, so it may use total.
+          predict:
+            prompt: Why does WHERE repeat price * qty instead of using total?
+            options:
+              - text: It is only a style choice
+                explanation: In PostgreSQL, WHERE total > 100 fails because the alias is unknown there.
+              - text: WHERE runs before SELECT, so total does not exist yet
+                correct: true
+              - text: Aliases only work in GROUP BY
+                explanation: ORDER BY uses total in this very query; it runs after SELECT.
+        - text: NULL means unknown, and comparing anything with it gives unknown, never true. Use IS NULL and IS NOT NULL.
+          predict:
+            prompt: Why coupon IS NULL and not coupon = NULL?
+            options:
+              - text: Both mean the same
+                explanation: coupon = NULL yields unknown for every row, so WHERE keeps none of them.
+              - text: coupon = NULL is never true
+                correct: true
+        - text: ORDER BY total DESC sorts the rows that are left, and LIMIT 3 keeps the first three.
+      takeaway: Clauses run FROM → WHERE → SELECT → ORDER BY → LIMIT; test for NULL with IS NULL.
+    items:
+      - id: sql.select-basics.mcq-alias-in-where
+        type: mcq
+        prompt: "Why does `SELECT price * qty AS total FROM items WHERE total > 100;` fail in PostgreSQL?"
+        options:
+          - text: WHERE is evaluated before SELECT, so the alias total does not exist yet
+            correct: true
+            explanation: Repeat the expression in WHERE or wrap the query in a subquery/CTE. ORDER BY can use aliases because it runs after SELECT.
+          - text: Aliases can never be used anywhere in a query
+            misconception: aliases-unusable
+            explanation: ORDER BY (and outer queries) can reference them.
+          - text: Arithmetic is not allowed in SELECT
+            misconception: no-expressions-in-select
+            explanation: Any expression is allowed in the select list.
+        explanation: Knowing the logical evaluation order explains most "column does not exist" surprises.
+        hint: Which clause runs first, WHERE or SELECT?
+
+      - id: sql.select-basics.cloze-is-null
+        type: cloze
+        prompt: "Find users without an email: SELECT name FROM users WHERE email ___ NULL;"
+        answers: ["is"]
+        explanation: "`email = NULL` is never true (it evaluates to NULL, i.e. unknown); use IS NULL / IS NOT NULL."
+        hint: Equality with unknown is unknown.
+
+      - id: sql.select-basics.output-null-aggregates
+        type: output
+        prompt: "Table t has one column x with three rows: 1, NULL, 3. What values does this return?"
+        code: |
+          SELECT COUNT(*), COUNT(x), SUM(x), AVG(x) FROM t;
+        options:
+          - text: "3, 2, 4, 2"
+            correct: true
+            explanation: COUNT(*) counts rows; COUNT(x), SUM and AVG ignore NULLs, so AVG = 4 / 2.
+          - text: "3, 3, 4, 1.33"
+            misconception: null-counts-as-zero
+            explanation: NULL is not 0; aggregates over a column skip NULLs instead of treating them as zero.
+          - text: "3, 2, NULL, NULL"
+            misconception: null-poisons-aggregates
+            explanation: NULL propagates through arithmetic (1 + NULL), but aggregate functions skip NULL inputs.
+        explanation: Use COALESCE(x, 0) when you want NULL to count as zero.
+        hint: Which aggregates look at the column values?
+
+      - id: sql.select-basics.cmd-count-rows
+        type: command
+        prompt: Write the query that returns the number of rows in the users table.
+        answers:
+          - SELECT COUNT(*) FROM users;
+          - SELECT COUNT(*) FROM users
+          - select count(*) from users;
+          - select count(*) from users
+          - SELECT count(*) FROM users;
+          - SELECT count(*) FROM users
+        explanation: COUNT(*) counts rows regardless of NULLs.
+        hint: Aggregate with a star.
+
+      - id: sql.select-basics.code-no-email
+        type: code
+        language: sql
+        prompt: List the names of the users without an email, alphabetically.
+        setup: |
+          CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);
+          INSERT INTO users VALUES
+            (1, 'Cy', NULL), (2, 'Ana', 'ana@x.com'), (3, 'Bo', NULL), (4, 'Di', '');
+        starter: |
+          SELECT name
+          FROM users
+          WHERE email = NULL;
+        solution: |
+          SELECT name
+          FROM users
+          WHERE email IS NULL
+          ORDER BY name;
+        rows:
+          - [Bo]
+          - [Cy]
+        ordered: true
+        explanation: "`email = NULL` is unknown for every row, so WHERE keeps none. IS NULL matches the missing emails; Di's empty string is a value, not NULL."
+        hint: Equality with unknown is unknown.
+
+      - id: sql.select-basics.code-top-orders
+        type: code
+        language: sql
+        prompt: Show name and total (price * qty) of the 2 largest orders without a coupon whose total exceeds 100, largest first.
+        setup: |
+          CREATE TABLE orders (name TEXT, price INTEGER, qty INTEGER, coupon TEXT);
+          INSERT INTO orders VALUES
+            ('lamp', 40, 3, NULL), ('desk', 300, 1, 'SPRING'), ('chair', 90, 2, NULL),
+            ('pen', 2, 10, NULL), ('rug', 150, 1, NULL);
+        starter: |
+          SELECT name, price * qty AS total
+          FROM orders
+        solution: |
+          SELECT name, price * qty AS total
+          FROM orders
+          WHERE coupon IS NULL
+            AND price * qty > 100
+          ORDER BY total DESC
+          LIMIT 2;
+        rows:
+          - [chair, 180]
+          - [rug, 150]
+        ordered: true
+        explanation: WHERE repeats price * qty because it runs before SELECT names total; ORDER BY runs after SELECT, so it may use the alias. LIMIT keeps the first rows of the sorted result.
+        hint: Filter in WHERE, sort with ORDER BY … DESC, then LIMIT.
+
+  - id: sql.joins
+    title: Joins
+    summary: >
+      INNER JOIN keeps matching rows; LEFT JOIN keeps every left row and fills
+      missing right columns with NULL. Filters on the right table belong in ON
+      to preserve the outer join.
+    level: beginner
+    prereqs: [sql.select-basics]
+    lesson:
+      intro: "A join pairs rows from two tables by a condition. The join type decides what happens to rows that find no partner: authors Ana, Bo and Cy, where only Ana and Cy have books."
+      example:
+        lang: sql
+        code: |
+          SELECT a.name, b.title
+          FROM authors a
+          LEFT JOIN books b ON b.author_id = a.id;
+          -- Ana|A1  Ana|A2  Bo|NULL  Cy|C1
+
+          SELECT a.name, b.title
+          FROM authors a
+          LEFT JOIN books b ON b.author_id = a.id
+          WHERE b.year >= 2023;
+          -- Ana|A2  Cy|C1
+      steps:
+        - text: JOIN (INNER JOIN) keeps only pairs that match the ON condition. Bo has no books, so an inner join would leave Bo out entirely.
+        - text: LEFT JOIN keeps every row of the left table. A left row with no match appears once, with NULL in every column of the right table. A left row with several matches appears once per match.
+          predict:
+            prompt: How many rows does the first query return?
+            options:
+              - text: "3, one per author"
+                explanation: Ana matches two books, so Ana appears twice.
+              - text: "4"
+                correct: true
+              - text: "3, one per book"
+                explanation: That is the inner join; LEFT JOIN also keeps Bo with NULLs.
+        - text: RIGHT JOIN is the mirror image and keeps every row of the right table. Put the table whose rows must all survive on the left.
+        - text: WHERE runs after the join. For Bo, b.year is NULL, and NULL >= 2023 is not true, so Bo is dropped and the outer join behaves like an inner join. A condition in ON only limits which right rows match.
+          predict:
+            prompt: Move b.year >= 2023 into ON (ON b.author_id = a.id AND b.year >= 2023). Is Bo in the result?
+            options:
+              - text: Yes, with NULL for the title
+                correct: true
+              - text: No, Bo has no books from 2023
+                explanation: In ON the condition only decides which books match; LEFT JOIN still keeps every author.
+      takeaway: "LEFT JOIN keeps all left rows (NULLs when unmatched, one row per match); filter the right table in ON, not WHERE."
+    items:
+      - id: sql.joins.mcq-left-join
+        type: mcq
+        prompt: Which query lists every customer, including those with no orders?
+        options:
+          - text: SELECT c.name, o.id FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
+            correct: true
+            explanation: Customers without orders appear once with o.id = NULL.
+          - text: SELECT c.name, o.id FROM customers c JOIN orders o ON o.customer_id = c.id
+            misconception: join-keeps-unmatched
+            explanation: A plain JOIN is an INNER JOIN; it drops customers without orders.
+          - text: SELECT c.name, o.id FROM customers c RIGHT JOIN orders o ON o.customer_id = c.id
+            misconception: left-right-swapped
+            explanation: RIGHT JOIN keeps every order, not every customer.
+        explanation: The table whose rows must all survive goes on the left of a LEFT JOIN.
+        hint: Which side must keep all its rows?
+
+      - id: sql.joins.output-left-join-count
+        type: output
+        prompt: "users(id) has rows 1, 2, 3; orders(user_id) has rows 1, 1, 2. What does this return?"
+        code: |
+          SELECT COUNT(*)
+          FROM users u
+          LEFT JOIN orders o ON o.user_id = u.id;
+        answers: ["4"]
+        explanation: User 1 matches two orders (2 rows), user 2 one (1 row), user 3 none but is kept with NULLs (1 row) — 4 rows.
+        hint: A LEFT JOIN can multiply rows and also keeps unmatched ones.
+
+      - id: sql.joins.bug-where-kills-left-join
+        type: bug
+        prompt: "Intended: every user, with their paid orders if they have any. Users without paid orders disappear. Which line is wrong?"
+        code: |
+          SELECT u.name, o.total
+          FROM users u
+          LEFT JOIN orders o ON o.user_id = u.id
+          WHERE o.status = 'paid';
+        bug_line: 4
+        explanation: For users without orders o.status is NULL, and WHERE drops them — the LEFT JOIN becomes an INNER JOIN. Move the condition into ON, `ON o.user_id = u.id AND o.status = 'paid'`.
+        hint: What is o.status for a user with no orders?
+
+      - id: sql.joins.code-every-author
+        type: code
+        language: sql
+        prompt: List every author's name with the title of each of their books. Authors without books must appear too, with NULL as the title.
+        setup: |
+          CREATE TABLE authors (id INTEGER PRIMARY KEY, name TEXT);
+          CREATE TABLE books (id INTEGER PRIMARY KEY, author_id INTEGER, title TEXT, year INTEGER);
+          INSERT INTO authors VALUES (1, 'Ana'), (2, 'Bo'), (3, 'Cy');
+          INSERT INTO books VALUES (1, 1, 'A1', 2019), (2, 1, 'A2', 2024), (3, 3, 'C1', 2023);
+        starter: |
+          SELECT a.name, b.title
+          FROM authors a
+          JOIN books b ON b.author_id = a.id;
+        solution: |
+          SELECT a.name, b.title
+          FROM authors a
+          LEFT JOIN books b ON b.author_id = a.id;
+        rows:
+          - [Ana, A1]
+          - [Ana, A2]
+          - [Bo, null]
+          - [Cy, C1]
+        explanation: JOIN is an inner join and drops Bo. LEFT JOIN keeps every author, once per matching book, and once with NULLs when nothing matches.
+        hint: Which join keeps every row of the left table?
+
+      - id: sql.joins.code-paid-orders
+        type: code
+        language: sql
+        prompt: List every user with the total of their paid orders, if any. Users without paid orders must still appear, with NULL as the total.
+        setup: |
+          CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT);
+          CREATE TABLE orders (id INTEGER PRIMARY KEY, user_id INTEGER, total INTEGER, status TEXT);
+          INSERT INTO users VALUES (1, 'Ana'), (2, 'Bo'), (3, 'Cy');
+          INSERT INTO orders VALUES (1, 1, 30, 'paid'), (2, 2, 15, 'refunded'), (3, 1, 12, 'refunded');
+        starter: |
+          SELECT u.name, o.total
+          FROM users u
+          LEFT JOIN orders o ON o.user_id = u.id
+          WHERE o.status = 'paid';
+        solution: |
+          SELECT u.name, o.total
+          FROM users u
+          LEFT JOIN orders o ON o.user_id = u.id AND o.status = 'paid';
+        rows:
+          - [Ana, 30]
+          - [Bo, null]
+          - [Cy, null]
+        explanation: In WHERE, o.status = 'paid' is not true for Bo and Cy, so they vanish. In ON it only limits which orders match, and LEFT JOIN keeps every user.
+        hint: Move the status test from WHERE into ON.
+
+  - id: sql.aggregation
+    title: GROUP BY, HAVING and window functions
+    summary: >
+      GROUP BY collapses rows into groups; every selected column must be
+      grouped or aggregated. WHERE filters rows before grouping, HAVING filters
+      groups after. Window functions aggregate without collapsing rows.
+    level: intermediate
+    prereqs: [sql.joins]
+    lesson:
+      intro: GROUP BY turns many rows into one row per group, and aggregates such as COUNT, SUM and AVG summarize each group. Window functions summarize without merging rows.
+      example:
+        lang: sql
+        code: |
+          SELECT dept, COUNT(*) AS n, AVG(salary)
+          FROM staff
+          WHERE active = 1
+          GROUP BY dept
+          HAVING COUNT(*) >= 2
+          ORDER BY n DESC;
+
+          SELECT name, dept,
+            RANK() OVER (PARTITION BY dept
+                         ORDER BY salary DESC) AS r
+          FROM staff;
+      steps:
+        - text: "The clauses run in this order: FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY, LIMIT. They are always written as SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT."
+        - text: WHERE filters single rows before grouping, so it cannot use aggregates. HAVING filters whole groups after the aggregates exist.
+          predict:
+            prompt: Where could you put the condition active = 1?
+            options:
+              - text: Only in HAVING
+                explanation: HAVING sees groups; active is a per-row column that is not grouped.
+              - text: In WHERE, because it tests single rows
+                correct: true
+              - text: In ORDER BY
+                explanation: ORDER BY sorts and never removes rows.
+        - text: Each group yields one row, so every selected column must be in GROUP BY or inside an aggregate. Selecting name here would ask for one name out of many, and PostgreSQL rejects it.
+          predict:
+            prompt: Why does SELECT dept, name, COUNT(*) … GROUP BY dept fail in PostgreSQL?
+            options:
+              - text: name is neither grouped nor aggregated
+                correct: true
+              - text: COUNT(*) needs a column name
+                explanation: COUNT(*) counts rows; the problem is name, which has many values per group.
+        - text: "OVER (…) makes RANK a window function: every row stays, and each gets its rank inside its PARTITION BY group, ordered by salary. Ties share a rank and leave a gap (1, 1, 3); DENSE_RANK has no gap and ROW_NUMBER never ties."
+      takeaway: "Row filters in WHERE, group filters in HAVING; select only grouped or aggregated columns; OVER keeps the rows."
+    items:
+      - id: sql.aggregation.mcq-where-vs-having
+        type: mcq
+        prompt: You need customers whose total paid revenue exceeds 1000. Where does `SUM(total) > 1000` go?
+        options:
+          - text: In HAVING, because it filters groups after aggregation
+            correct: true
+            explanation: The sum exists only after GROUP BY.
+          - text: In WHERE
+            misconception: where-filters-groups
+            explanation: WHERE runs before grouping and cannot contain aggregates.
+          - text: In ORDER BY
+            misconception: order-by-filters
+            explanation: ORDER BY sorts; it never removes rows.
+        explanation: "Rule of thumb: row conditions in WHERE, aggregate conditions in HAVING."
+        hint: When is SUM computed?
+
+      - id: sql.aggregation.parsons-top-customers
+        type: parsons
+        prompt: Order the clauses to get the 10 customers with the highest paid revenue above 1000.
+        lines:
+          - "SELECT customer_id, SUM(total) AS revenue"
+          - "FROM orders"
+          - "WHERE status = 'paid'"
+          - "GROUP BY customer_id"
+          - "HAVING SUM(total) > 1000"
+          - "ORDER BY revenue DESC"
+          - "LIMIT 10;"
+        explanation: The written order is fixed — SELECT, FROM, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT — even though it is evaluated in a different order.
+        hint: HAVING always follows GROUP BY.
+
+      - id: sql.aggregation.bug-ungrouped-column
+        type: bug
+        prompt: PostgreSQL rejects this query. Which line is wrong?
+        code: |
+          SELECT department, name, COUNT(*)
+          FROM employees
+          GROUP BY department;
+        bug_line: 1
+        explanation: name is neither grouped nor aggregated — which of the many names per department should appear? Group by it, aggregate it (string_agg), or drop it.
+        hint: Each group produces exactly one row.
+
+      - id: sql.aggregation.cloze-window
+        type: cloze
+        prompt: "Rank employees by salary within each department without collapsing rows: RANK() ___ (PARTITION BY department ORDER BY salary DESC)"
+        answers: ["over"]
+        explanation: OVER turns an aggregate or ranking function into a window function; PARTITION BY restarts it per department.
+        hint: The keyword that defines the window.
+
+      - id: sql.aggregation.code-busy-depts
+        type: code
+        language: sql
+        prompt: For each department with at least 2 active staff, show the department and how many active staff it has, largest first.
+        setup: |
+          CREATE TABLE staff (name TEXT, dept TEXT, salary INTEGER, active INTEGER);
+          INSERT INTO staff VALUES
+            ('Ana', 'eng', 120, 1), ('Bo', 'eng', 100, 1), ('Cy', 'eng', 90, 1),
+            ('Di', 'ops', 80, 1), ('Ed', 'ops', 85, 0),
+            ('Fay', 'sales', 70, 1), ('Gus', 'sales', 75, 1);
+        starter: |
+          SELECT dept, COUNT(*) AS n
+          FROM staff
+        solution: |
+          SELECT dept, COUNT(*) AS n
+          FROM staff
+          WHERE active = 1
+          GROUP BY dept
+          HAVING COUNT(*) >= 2
+          ORDER BY n DESC;
+        rows:
+          - [eng, 3]
+          - [sales, 2]
+        ordered: true
+        explanation: active = 1 tests single rows, so it goes in WHERE; COUNT(*) >= 2 tests groups, so it goes in HAVING. ops has only Di active and is dropped.
+        hint: Row filter in WHERE, group filter in HAVING.
+
+      - id: sql.aggregation.code-rank-in-dept
+        type: code
+        language: sql
+        prompt: Show every staff member's name, department and salary rank inside their department (1 = highest salary). Keep every row.
+        setup: |
+          CREATE TABLE staff (name TEXT, dept TEXT, salary INTEGER);
+          INSERT INTO staff VALUES
+            ('Ana', 'eng', 120), ('Bo', 'eng', 100), ('Cy', 'eng', 120),
+            ('Di', 'ops', 80), ('Ed', 'ops', 85);
+        starter: |
+          SELECT name, dept
+          FROM staff;
+        solution: |
+          SELECT name, dept,
+            RANK() OVER (PARTITION BY dept ORDER BY salary DESC) AS r
+          FROM staff;
+        rows:
+          - [Ana, eng, 1]
+          - [Cy, eng, 1]
+          - [Bo, eng, 3]
+          - [Ed, ops, 1]
+          - [Di, ops, 2]
+        explanation: OVER makes RANK a window function, so no row collapses. PARTITION BY restarts the ranking per department; Ana and Cy tie at 1, so Bo is 3.
+        hint: RANK() OVER (PARTITION BY … ORDER BY … DESC).
+
+  - id: sql.indexes
+    title: Indexes and query plans
+    summary: >
+      A B-tree index makes lookups and range scans O(log n) instead of a full
+      scan. Composite indexes follow the leftmost-prefix rule. EXPLAIN ANALYZE
+      shows the plan the planner chose.
+    level: intermediate
+    prereqs: [sql.aggregation, logic.binary-search]
+    lesson:
+      intro: A B-tree index keeps a column's values sorted, with pointers to the rows. The database can binary-search it in O(log n) instead of reading every row.
+      example:
+        lang: sql
+        code: |
+          CREATE INDEX idx_orders_cust_date
+            ON orders (customer_id, created_at);
+
+          EXPLAIN QUERY PLAN SELECT * FROM orders
+          WHERE customer_id = 42
+            AND created_at >= '2026-01-01';
+          -- SEARCH orders USING INDEX …
+
+          EXPLAIN QUERY PLAN SELECT * FROM orders
+          WHERE created_at >= '2026-01-01';
+          -- SCAN orders
+      steps:
+        - text: A composite index is sorted by the first column, then by the second within each first value, like a phone book sorted by last name, then first name.
+        - text: "Equality on customer_id finds one contiguous slice, and inside it created_at is sorted, so the range is one more seek. This is the leftmost-prefix rule: the index helps when the query fixes columns from the left."
+          predict:
+            prompt: Can this index serve WHERE customer_id = 42 on its own?
+            options:
+              - text: No, both columns are required
+                explanation: A prefix of the index is enough; customer_id alone is the leftmost column.
+              - text: Yes, it is the leftmost column
+                correct: true
+        - text: Filtering only by created_at skips the first column. Recent dates are spread across every customer, so the plan is a full scan. That query needs its own index on created_at.
+        - text: "A seek also needs the predicate to match the stored values. lower(email) = … needs an expression index on lower(email). LIKE '%@x.com' has no fixed prefix to seek to. Equality and IN lists are fine."
+          predict:
+            prompt: With an index on users(email), which predicate cannot seek it?
+            options:
+              - text: email = 'ana@x.com'
+                explanation: Plain equality on the indexed column is the textbook lookup.
+              - text: email LIKE 'ana%'
+                explanation: A fixed prefix is a range in sorted order, so it can seek (with a suitable collation or operator class in PostgreSQL).
+              - text: email LIKE '%ana'
+                correct: true
+        - text: The planner may still choose a sequential scan when a filter matches most rows; many random index reads cost more than one pass. EXPLAIN ANALYZE (PostgreSQL) shows the chosen plan and real timings.
+      takeaway: Composite indexes follow the leftmost prefix; expressions and leading wildcards defeat them; low selectivity favors a scan.
+    items:
+      - id: sql.indexes.mcq-leftmost-prefix
+        type: mcq
+        prompt: "There is an index on orders (customer_id, created_at). Which query can use it efficiently as a B-tree range lookup?"
+        options:
+          - text: WHERE customer_id = 42 AND created_at > now() - interval '7 days'
+            correct: true
+            explanation: Equality on the first column, then a range on the second — exactly the index order.
+          - text: WHERE created_at > now() - interval '7 days'
+            misconception: composite-any-column
+            explanation: Without the leading column, entries for recent dates are scattered across all customers; it needs a separate index on created_at.
+          - text: WHERE customer_id + 0 = 42
+            misconception: expressions-use-index
+            explanation: Wrapping the column in an expression prevents a plain index lookup.
+        explanation: Put equality columns first and range columns last in composite indexes.
+        hint: A phone book is sorted by last name, then first name.
+
+      - id: sql.indexes.multi-defeat-index
+        type: multi
+        prompt: "With a plain B-tree index on users(email), which predicates cannot use it for a lookup?"
+        options:
+          - text: WHERE lower(email) = 'ana@x.com'
+            correct: true
+            explanation: The index stores email, not lower(email); create an expression index on lower(email).
+          - text: WHERE email LIKE '%@x.com'
+            correct: true
+            explanation: A leading wildcard has no fixed prefix to seek to in the sorted index.
+          - text: WHERE email = 'ana@x.com'
+            misconception: index-never-used
+            explanation: Equality on the indexed column is the textbook index lookup.
+          - text: WHERE email IN ('a@x.com', 'b@x.com')
+            misconception: in-list-defeats-index
+            explanation: IN is a set of equality lookups; the planner can use the index for each value.
+        explanation: Indexes help when the predicate matches how the index is sorted.
+        hint: Can you binary-search the sorted emails with that condition?
+
+      - id: sql.indexes.cmd-create-index
+        type: command
+        prompt: Create a B-tree index named idx_orders_user_id on orders(user_id).
+        answers:
+          - CREATE INDEX idx_orders_user_id ON orders (user_id);
+          - CREATE INDEX idx_orders_user_id ON orders(user_id);
+          - CREATE INDEX idx_orders_user_id ON orders (user_id)
+          - CREATE INDEX idx_orders_user_id ON orders(user_id)
+          - create index idx_orders_user_id on orders (user_id);
+          - create index idx_orders_user_id on orders(user_id);
+        explanation: B-tree is the default index type. In production PostgreSQL, CREATE INDEX CONCURRENTLY avoids blocking writes.
+        hint: CREATE INDEX name ON table (column).
+
+      - id: sql.indexes.mcq-seq-scan
+        type: mcq
+        prompt: EXPLAIN ANALYZE shows "Seq Scan on orders" for WHERE status = 'paid', even though status is indexed, and 90% of rows are paid. Why?
+        options:
+          - text: The planner estimates that reading most of the table sequentially is cheaper than many random index lookups
+            correct: true
+            explanation: Low-selectivity predicates make index scans slower than a sequential scan.
+          - text: The index is corrupt
+            misconception: seq-scan-means-broken
+            explanation: Choosing a sequential scan for a non-selective filter is normal planner behavior.
+          - text: PostgreSQL never uses indexes on text columns
+            misconception: no-index-on-text
+            explanation: B-tree indexes on text work for equality and prefix ranges.
+        explanation: Indexes pay off when they filter out most rows (high selectivity); keep statistics fresh with ANALYZE.
+        hint: How many rows match?
+
+      - id: sql.indexes.code-column-order
+        type: code
+        language: sql
+        prompt: "The hot query is WHERE customer_id = ? AND created_at >= ?. Fix the index so a B-tree can seek both conditions. The last line lists the index's columns in order (checked with SQLite's pragma_index_info)."
+        setup: |
+          CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, created_at TEXT, total INTEGER);
+        starter: |
+          CREATE INDEX idx_orders_cust_date ON orders (created_at, customer_id);
+          SELECT name FROM pragma_index_info('idx_orders_cust_date');
+        solution: |
+          CREATE INDEX idx_orders_cust_date ON orders (customer_id, created_at);
+          SELECT name FROM pragma_index_info('idx_orders_cust_date');
+        rows:
+          - [customer_id]
+          - [created_at]
+        ordered: true
+        explanation: Equality columns first, range columns last. With customer_id first, the equality finds one slice where created_at is sorted, so the range is one more seek. With created_at first, matching dates are scattered across customers.
+        hint: The leftmost-prefix rule; which column does the query fix exactly?
+
+  - id: sql.transactions
+    title: Transactions and concurrency
+    summary: >
+      A transaction is atomic: all of its statements commit or none do.
+      Isolation levels trade anomalies for concurrency; lost updates come from
+      read-modify-write without locking.
+    level: advanced
+    prereqs: [sql.indexes]
+    lesson:
+      intro: "A transaction groups statements into one unit: either all of their changes become permanent or none do."
+      example:
+        lang: sql
+        code: |
+          BEGIN;
+          UPDATE accounts SET balance = balance - 50
+            WHERE id = 1;
+          UPDATE accounts SET balance = balance + 50
+            WHERE id = 2;
+          COMMIT;
+
+          UPDATE items SET stock = stock - 1
+          WHERE id = 7 AND stock > 0;
+      steps:
+        - text: BEGIN starts the transaction and COMMIT makes both updates visible together. After an error or ROLLBACK neither one applies, so money is never taken from one account without reaching the other.
+          predict:
+            prompt: The second UPDATE fails and the transaction is rolled back. What is account 1's balance?
+            options:
+              - text: Its original value
+                correct: true
+              - text: 50 lower
+                explanation: Rollback undoes the first UPDATE as well; that is atomicity.
+        - text: "ACID: Atomicity (all or nothing), Consistency (constraints and invariants still hold), Isolation (concurrent transactions do not see each other's half-done work, to the degree the isolation level allows), Durability (committed data survives a crash, thanks to the write-ahead log)."
+        - text: ACID consistency is not CAP consistency. CAP's C means every replica returns the latest write (linearizability), a property of distributed systems.
+        - text: "Lost update: two requests both read stock 5, both compute 4 in the application and both write 4. One sale vanishes. BEGIN and COMMIT alone do not stop it under READ COMMITTED, because both reads happen before either write."
+          predict:
+            prompt: Stock is 1. Two requests run the conditional UPDATE above. What is the final stock?
+            options:
+              - text: "-1"
+                explanation: The second UPDATE waits for the first, re-checks stock > 0, finds 0 and changes no rows.
+              - text: "1"
+                explanation: The first UPDATE matches and commits its decrement.
+              - text: "0"
+                correct: true
+        - text: Let the database compute the value (stock = stock - 1), lock the row first with SELECT … FOR UPDATE, use an optimistic version column, or run SERIALIZABLE and retry on failure.
+      takeaway: "BEGIN … COMMIT makes changes atomic; prevent lost updates with atomic UPDATEs, row locks or SERIALIZABLE."
+    items:
+      - id: sql.transactions.cloze-begin-commit
+        type: cloze
+        prompt: Make the transfer atomic.
+        code: |
+          ___;
+          UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+          UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+          ___;
+        answers: ["begin | commit", "start transaction | commit", "begin transaction | commit", "begin | end"]
+        explanation: Between BEGIN and COMMIT either both updates become visible or, after an error or ROLLBACK, neither does.
+        hint: Start, then commit.
+
+      - id: sql.transactions.mcq-lost-update
+        type: mcq
+        prompt: "Two requests both run `SELECT stock FROM items WHERE id = 7` (they read 5), then `UPDATE items SET stock = 4 WHERE id = 7`. Stock ends at 4 instead of 3. What is the simplest correct fix?"
+        options:
+          - text: Do it atomically, UPDATE items SET stock = stock - 1 WHERE id = 7 AND stock > 0 (or lock the row with SELECT ... FOR UPDATE)
+            correct: true
+            explanation: The database serializes concurrent updates of the same row, so each decrement applies to the latest value.
+          - text: Wrap the two statements in BEGIN/COMMIT under the default READ COMMITTED level
+            misconception: transaction-prevents-all-races
+            explanation: Without a lock both transactions still read 5 before either writes; atomicity is not isolation.
+          - text: Add an index on items.id
+            misconception: index-fixes-concurrency
+            explanation: Indexes speed up lookups; they do not order concurrent writes.
+        explanation: This is the lost-update anomaly. Fix it with atomic updates, row locks, optimistic version columns, or SERIALIZABLE with retries.
+        hint: Let the database compute the new value.
+
+      - id: sql.transactions.multi-acid
+        type: multi
+        prompt: Which statements about ACID are correct?
+        options:
+          - text: Atomicity — a transaction's changes apply completely or not at all
+            correct: true
+            explanation: A failure midway rolls everything back.
+          - text: Durability — once committed, changes survive a crash
+            correct: true
+            explanation: The write-ahead log is flushed on commit.
+          - text: Isolation — concurrent transactions behave as if run in some order, to the degree set by the isolation level
+            correct: true
+            explanation: READ COMMITTED, REPEATABLE READ and SERIALIZABLE allow different anomalies.
+          - text: Consistency — every replica returns the latest write
+            misconception: acid-c-is-cap-c
+            explanation: ACID consistency means constraints and invariants hold; "latest write everywhere" is CAP consistency (linearizability).
+        explanation: ACID's C and CAP's C are different ideas with the same letter.
+        hint: One C is about constraints, the other about replicas.
+
+      - id: sql.transactions.code-transfer
+        type: code
+        language: sql
+        prompt: Move 50 from account 1 to account 2 in one transaction, then list every account's id and balance by id.
+        setup: |
+          CREATE TABLE accounts (id INTEGER PRIMARY KEY, balance INTEGER NOT NULL);
+          INSERT INTO accounts VALUES (1, 100), (2, 100), (3, 20);
+        starter: |
+          BEGIN;
+          -- your two updates
+          COMMIT;
+          SELECT id, balance FROM accounts ORDER BY id;
+        solution: |
+          BEGIN;
+          UPDATE accounts SET balance = balance - 50 WHERE id = 1;
+          UPDATE accounts SET balance = balance + 50 WHERE id = 2;
+          COMMIT;
+          SELECT id, balance FROM accounts ORDER BY id;
+        rows:
+          - [1, 50]
+          - [2, 150]
+          - [3, 20]
+        ordered: true
+        explanation: Between BEGIN and COMMIT both updates apply together or, after an error or ROLLBACK, neither does. Let the database compute the new balance (balance - 50) instead of writing a value read earlier.
+        hint: One UPDATE takes 50 away, the other adds it.
+
+      - id: sql.transactions.code-safe-decrement
+        type: code
+        language: sql
+        prompt: Sell one unit of item 7 with a single statement that can never take stock below 0, then show its stock. Item 8 is sold out; selling it must change nothing.
+        setup: |
+          CREATE TABLE items (id INTEGER PRIMARY KEY, stock INTEGER NOT NULL);
+          INSERT INTO items VALUES (7, 1), (8, 0);
+        starter: |
+          UPDATE items SET stock = 0 WHERE id = 7;
+          UPDATE items SET stock = -1 WHERE id = 8;
+          SELECT id, stock FROM items ORDER BY id;
+        solution: |
+          UPDATE items SET stock = stock - 1 WHERE id = 7 AND stock > 0;
+          UPDATE items SET stock = stock - 1 WHERE id = 8 AND stock > 0;
+          SELECT id, stock FROM items ORDER BY id;
+        rows:
+          - [7, 0]
+          - [8, 0]
+        ordered: true
+        explanation: stock = stock - 1 with AND stock > 0 reads and writes in one statement, so concurrent sales cannot lose an update or oversell; on item 8 it matches no row.
+        hint: Compute the new value in SQL and guard it in WHERE.
+
+sections:
+  - id: sql/querying
+    title: Querying
+    concepts: [sql.select-basics, sql.joins, sql.aggregation]
+  - id: sql/performance-safety
+    title: Performance & safety
+    concepts: [sql.indexes, sql.transactions]

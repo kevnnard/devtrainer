@@ -1,0 +1,506 @@
+track:
+  id: docker
+  title: Docker
+  description: Images, containers, Dockerfiles, volumes, networks and Compose v2 — built on Linux processes and networking.
+  order: 70
+
+concepts:
+  - id: docker.images-containers
+    title: Images and containers
+    summary: >
+      An image is a read-only stack of layers; a container is a running (or
+      stopped) instance of an image with its own writable layer. Containers are
+      isolated Linux processes sharing the host kernel.
+    level: beginner
+    prereqs: [linux.processes]
+    lesson:
+      intro: An image is a read-only template. A container is a process started from an image, with its own thin writable layer.
+      example:
+        lang: shell
+        code: |
+          $ docker pull redis:7
+          $ docker run -d --name cache redis:7
+          $ docker ps
+          $ docker stop cache
+          $ docker ps -a
+          $ docker rm cache
+      steps:
+        - text: docker pull downloads the image's layers once. They are read-only and shared by every container made from the image.
+        - text: The container is a Linux process isolated with namespaces and cgroups, plus a writable layer on top of the image's layers.
+          predict:
+            prompt: docker run -d starts a container. What is it, really?
+            options:
+              - text: A full copy of the image's files
+                explanation: The image layers are shared; the container adds only a thin writable layer.
+              - text: An isolated process on the host's kernel
+                correct: true
+              - text: A small virtual machine with its own kernel
+                explanation: Containers share the host kernel; namespaces and cgroups isolate them.
+        - text: A stopped container still exists, with its writable layer. docker ps -a lists it as Exited; plain docker ps hides it.
+          predict:
+            prompt: After docker stop cache, does plain docker ps list cache?
+            options:
+              - text: Yes, marked Exited
+                explanation: That is docker ps -a; plain docker ps shows only running containers.
+              - text: No, docker ps lists only running containers
+                correct: true
+        - text: docker rm deletes the container and its writable layer. The image stays, ready for the next docker run.
+      takeaway: "Image: read-only layers. Container: an isolated process plus a writable layer, kept until docker rm."
+    items:
+      - id: docker.images-containers.mcq-image-vs-container
+        type: mcq
+        prompt: What is the relationship between an image and a container?
+        options:
+          - text: A container is a process started from an image, plus a thin writable layer on top of the image's read-only layers
+            correct: true
+            explanation: Many containers can run from one image; changes go to each container's own layer.
+          - text: They are the same thing; docker uses both words interchangeably
+            misconception: image-is-container
+            explanation: Images are templates; containers are instances with state and a lifecycle.
+          - text: A container is a virtual machine built from an image
+            misconception: container-is-vm
+            explanation: Containers share the host kernel; there is no guest OS kernel or hypervisor.
+        explanation: Think class (image) versus object (container).
+        hint: Which one has a PID?
+
+      - id: docker.images-containers.cmd-run-publish
+        type: command
+        prompt: Run the nginx image in the background, publishing host port 8080 to container port 80.
+        answers:
+          - docker run -d -p 8080:80 nginx
+          - docker run -p 8080:80 -d nginx
+          - docker run --detach -p 8080:80 nginx
+          - docker run -d --publish 8080:80 nginx
+          - docker run --detach --publish 8080:80 nginx
+          - docker container run -d -p 8080:80 nginx
+          - docker container run -p 8080:80 -d nginx
+        explanation: "`-d` detaches; `-p HOST:CONTAINER` forwards the host port to the container port. Options go before the image name."
+        hint: The port mapping is host first, then container.
+
+      - id: docker.images-containers.multi-facts
+        type: multi
+        prompt: Which statements are true?
+        options:
+          - text: Containers share the host's kernel
+            correct: true
+            explanation: Isolation comes from namespaces and cgroups, not from a separate kernel.
+          - text: A stopped container keeps its writable layer until it is removed
+            correct: true
+            explanation: docker start brings it back with its changes; docker rm deletes them.
+          - text: docker run pulls the newest version of the tag every time
+            misconception: run-always-pulls
+            explanation: run pulls only if the image is missing locally (unless --pull=always); use docker pull to update.
+          - text: Each container boots its own operating system
+            misconception: container-is-vm
+            explanation: The container's main process starts directly; there is no boot sequence.
+        explanation: A container is "just a process" with namespaces, cgroups and a layered filesystem.
+        hint: Is there a hypervisor involved?
+
+      - id: docker.images-containers.cmd-ps-all
+        type: command
+        prompt: List all containers, including stopped ones.
+        answers:
+          - docker ps -a
+          - docker ps --all
+          - docker container ls -a
+          - docker container ls --all
+        explanation: "`docker ps` shows only running containers; `-a` adds exited ones."
+        hint: The flag means all.
+
+  - id: docker.dockerfile
+    title: Dockerfiles and layer caching
+    summary: >
+      Each instruction creates a cached layer; a change invalidates that layer
+      and every one after it. Order from least to most frequently changed and
+      use multi-stage builds for small runtime images.
+    level: intermediate
+    prereqs: [docker.images-containers]
+    lesson:
+      intro: Each Dockerfile instruction produces a layer, and the builder reuses a cached layer while its inputs are unchanged. Instruction order decides how much is rebuilt.
+      example:
+        lang: dockerfile
+        code: |
+          FROM python:3.13-slim
+          WORKDIR /app
+          COPY requirements.txt .
+          RUN pip install --no-cache-dir \
+              -r requirements.txt
+          COPY . .
+          USER 10001
+          CMD ["python", "-m", "app"]
+      steps:
+        - text: "Once one layer misses the cache, every layer after it is rebuilt too. A COPY misses whenever a copied file changed."
+        - text: Only requirements.txt is copied before pip install, so the slow install layer stays cached while you edit code. COPY . . comes last because it changes on almost every build.
+          predict:
+            prompt: You edit one .py file and rebuild. Which steps run again?
+            options:
+              - text: Everything from FROM on
+                explanation: FROM, WORKDIR, the requirements COPY and pip install have unchanged inputs and come from the cache.
+              - text: COPY . . and the steps after it
+                correct: true
+              - text: Only pip install
+                explanation: pip install's input, requirements.txt, did not change; the source COPY did.
+        - text: A .dockerignore file next to the Dockerfile works like .gitignore for the build context. Leaving out .git, local dependency folders and .env makes builds faster and keeps secrets out of COPY . .
+        - text: "CMD [\"python\", \"-m\", \"app\"] is exec form: python runs as PID 1 and receives the SIGTERM from docker stop. Shell form, CMD python -m app, starts /bin/sh -c as PID 1, which does not pass SIGTERM on, so after the 10 s grace period Docker sends SIGKILL."
+          predict:
+            prompt: With shell-form CMD, why does docker stop take the full 10 seconds?
+            options:
+              - text: The shell is PID 1 and does not forward SIGTERM
+                correct: true
+              - text: docker stop always waits 10 seconds
+                explanation: It waits up to 10 s; a process that handles SIGTERM exits at once.
+              - text: Python ignores signals in containers
+                explanation: Python handles SIGTERM normally when it is the process that receives it.
+        - text: "Multi-stage builds: a first stage (FROM … AS build) has compilers and dependencies and builds the artifact; a later FROM starts a small runtime image and copies only the result with COPY --from=build. The tools never ship."
+      takeaway: Copy dependency files and install before copying source; use exec-form CMD; build in one stage, ship from a minimal one.
+    items:
+      - id: docker.dockerfile.bug-cache-order
+        type: bug
+        prompt: Every source code change makes the build reinstall all dependencies. Which line causes it?
+        code: |
+          FROM node:22-alpine
+          WORKDIR /app
+          COPY . .
+          RUN npm ci
+          CMD ["node", "server.js"]
+        bug_line: 3
+        explanation: Copying all source before npm ci invalidates the install layer on every change. Copy package.json and package-lock.json first, run npm ci, then COPY . .
+        hint: Which layer changes whenever any file changes?
+
+      - id: docker.dockerfile.mcq-shell-form-signals
+        type: mcq
+        prompt: "A Dockerfile ends with `CMD node server.js` (shell form). docker stop always waits 10 s before the container dies. Why?"
+        options:
+          - text: Shell form runs /bin/sh -c as PID 1, which does not forward SIGTERM to node, so Docker sends SIGKILL after the timeout
+            correct: true
+            explanation: Use exec form, CMD ["node", "server.js"], so node is PID 1 and receives SIGTERM.
+          - text: docker stop always waits 10 seconds by design
+            misconception: stop-always-waits
+            explanation: It waits up to 10 s; a process that handles SIGTERM exits immediately.
+          - text: Node.js cannot handle signals inside containers
+            misconception: containers-block-signals
+            explanation: Node handles SIGTERM fine when it actually receives it.
+        explanation: This ties to Linux signals — docker stop sends SIGTERM, then SIGKILL after the grace period.
+        hint: Which process is PID 1 in shell form?
+
+      - id: docker.dockerfile.parsons-multistage
+        type: parsons
+        prompt: Order a multi-stage Dockerfile for a static Go binary.
+        lines:
+          - "FROM golang:1.25 AS build"
+          - "WORKDIR /src"
+          - "COPY go.mod go.sum ./"
+          - "RUN go mod download"
+          - "COPY . ."
+          - "RUN CGO_ENABLED=0 go build -o /out/app ./cmd/app"
+          - "FROM gcr.io/distroless/static-debian12"
+          - "COPY --from=build /out/app /app"
+          - "ENTRYPOINT [\"/app\"]"
+        explanation: Dependencies are downloaded in their own cached layer before the source is copied; only the binary goes to the tiny final stage.
+        hint: Dependency files are copied before the source.
+
+      - id: docker.dockerfile.cloze-dockerignore
+        type: cloze
+        prompt: "Keep node_modules, .git and .env out of the build context by listing them in a file named ___ next to the Dockerfile."
+        answers: [".dockerignore"]
+        explanation: The build context is sent to the builder; .dockerignore makes builds faster and stops secrets from being copied into images.
+        hint: It works like .gitignore.
+
+  - id: docker.volumes-networks
+    title: Volumes and networks
+    summary: >
+      Container filesystems are ephemeral; named volumes and bind mounts
+      persist data. On a user-defined network, containers reach each other by
+      name through Docker's embedded DNS.
+    level: intermediate
+    prereqs: [docker.dockerfile, linux.networking]
+    lesson:
+      intro: "A container's own filesystem disappears with the container, and each container has its own network stack. Volumes keep data; networks connect containers by name."
+      example:
+        lang: shell
+        code: |
+          $ docker network create shopnet
+          $ docker volume create shopdata
+          $ docker run -d --name store --network shopnet \
+              -e POSTGRES_PASSWORD=dev \
+              -v shopdata:/var/lib/postgresql/data \
+              postgres:17
+          $ docker run -d --name web --network shopnet \
+              -e DB_HOST=store -p 8080:8080 \
+              -v ./settings:/etc/web:ro mywebapp
+          $ docker rm -f store
+      steps:
+        - text: "-v shopdata:/path mounts a named volume, managed by Docker under its data directory. -v ./settings:/etc/web is a bind mount of a host directory. Append :ro to make a mount read-only inside the container; the default is rw."
+        - text: The volume has its own lifecycle. docker rm -f store deletes the container and its writable layer, but not the named volume.
+          predict:
+            prompt: After docker rm -f store, what happens to the database files in shopdata?
+            options:
+              - text: They are deleted with the container
+                explanation: Only the container's writable layer goes; named volumes are removed only with docker volume rm or compose down -v.
+              - text: They are saved into the postgres image
+                explanation: Images are read-only; containers never write into them.
+              - text: They stay, and a new container mounting shopdata sees them
+                correct: true
+        - text: On a user-defined network, Docker's embedded DNS resolves container names, so web reaches the database at store:5432. The default bridge network has no name resolution.
+        - text: Inside a container, localhost is that container's own loopback, not the host and not other containers. web connecting to localhost:5432 finds nothing listening.
+          predict:
+            prompt: Does web need -p 5432:5432 on store to connect to it?
+            options:
+              - text: No, containers on the same network connect directly
+                correct: true
+              - text: Yes, every port must be published
+                explanation: -p publishes a port on the host for outside clients; container-to-container traffic on a shared network does not need it.
+        - text: -p 8080:8080 maps host port 8080 to the container's port 8080 (host:container), so a browser on the host can reach web.
+      takeaway: Named volumes outlive containers; on a user-defined network use the container name, never localhost; -p is only for the host.
+    items:
+      - id: docker.volumes-networks.mcq-localhost
+        type: mcq
+        prompt: An api container connects to postgres at localhost:5432, but Postgres runs in a separate db container on the same user-defined network. Why does it fail?
+        options:
+          - text: Inside a container, localhost is the container itself; connect to the service name, db:5432
+            correct: true
+            explanation: Each container has its own network namespace and loopback.
+          - text: Port 5432 must be published with -p first
+            misconception: publish-for-internal
+            explanation: Publishing exposes ports to the host; containers on the same network reach each other directly.
+          - text: localhost means the Docker host from inside a container
+            misconception: localhost-is-host
+            explanation: That would be host.docker.internal (Docker Desktop) or the gateway IP.
+        explanation: Service discovery on user-defined networks is by name.
+        hint: Who is localhost inside a network namespace?
+
+      - id: docker.volumes-networks.mcq-persistence
+        type: mcq
+        prompt: You run `docker rm -f db` on a Postgres container that stored data in the named volume pgdata. What happens to the data?
+        options:
+          - text: It survives in pgdata; a new container mounting pgdata sees it
+            correct: true
+            explanation: Volumes have a lifecycle independent of containers.
+          - text: It is deleted with the container
+            misconception: volume-dies-with-container
+            explanation: Only the container's writable layer (and anonymous volumes with rm -v) are deleted.
+          - text: It is copied into the image
+            misconception: container-writes-image
+            explanation: Images are read-only; nothing a container writes changes the image.
+        explanation: Delete volumes explicitly with docker volume rm (or docker compose down -v).
+        hint: Is a named volume part of the container?
+
+      - id: docker.volumes-networks.cmd-volume-create
+        type: command
+        prompt: Create a named volume called pgdata.
+        answers:
+          - docker volume create pgdata
+        explanation: "`docker volume create` makes a managed volume under Docker's data directory; mount it with -v pgdata:/var/lib/postgresql/data."
+        hint: Volumes have their own docker subcommand.
+
+      - id: docker.volumes-networks.cloze-readonly-mount
+        type: cloze
+        prompt: "Bind-mount ./config from the host read-only: docker run -v ./config:/etc/app:___ myapp"
+        answers: ["ro"]
+        explanation: The :ro suffix makes the mount read-only inside the container; the default is rw.
+        hint: Two letters for read-only.
+
+  - id: docker.compose
+    title: Docker Compose v2
+    summary: >
+      compose.yaml declares services, networks and volumes; `docker compose`
+      (v2, a docker CLI plugin) runs them. Services reach each other by name;
+      depends_on orders startup but waits for health only with conditions.
+    level: intermediate
+    prereqs: [docker.volumes-networks]
+    lesson:
+      intro: "A compose.yaml declares an app's services, networks and volumes, and the docker compose plugin (Compose v2) runs them together as one project."
+      example:
+        lang: yaml
+        code: |
+          services:
+            web:
+              build: .
+              ports: ["8080:8080"]
+              environment:
+                REDIS_URL: redis://cache:6379
+              depends_on:
+                cache:
+                  condition: service_healthy
+            cache:
+              image: redis:7
+              healthcheck:
+                test: ["CMD", "redis-cli", "ping"]
+                interval: 5s
+      steps:
+        - text: Compose v2 is docker compose with a space, a docker CLI plugin. The old standalone docker-compose v1 is end-of-life. The file is compose.yaml; a top-level version key is obsolete.
+        - text: Compose creates a default network for the project, and each service is reachable by its service name. web reaches Redis at cache:6379, not at localhost.
+        - text: A plain depends_on list only orders startup and shutdown. condition service_healthy makes web wait until cache's healthcheck passes.
+          predict:
+            prompt: "With depends_on: [cache] and no condition, when does web start?"
+            options:
+              - text: Once the cache container has started
+                correct: true
+              - text: Once Redis accepts connections
+                explanation: Without a healthcheck Compose cannot know when the service is ready.
+              - text: At a random time, the list is ignored
+                explanation: depends_on does set the start order.
+        - text: "Common commands: up -d (--detach) starts everything in the background; ps lists services; logs -f <service> streams one service's logs; exec <service> sh opens a shell; down stops and removes containers and networks."
+          predict:
+            prompt: Which command also deletes the project's named volumes?
+            options:
+              - text: docker compose stop
+                explanation: stop only stops containers; nothing is removed.
+              - text: docker compose down
+                explanation: Without -v, down keeps named volumes so data survives.
+              - text: docker compose down -v
+                correct: true
+      takeaway: "docker compose (v2): services find each other by name; depends_on waits for health only with condition: service_healthy."
+    items:
+      - id: docker.compose.cmd-up-detached
+        type: command
+        prompt: Start all services of the compose project in the background (Compose v2).
+        answers:
+          - docker compose up -d
+          - docker compose up --detach
+        explanation: Compose v2 is `docker compose` (a space); the standalone `docker-compose` v1 binary is end-of-life.
+        hint: It is a subcommand of docker.
+
+      - id: docker.compose.bug-db-host
+        type: bug
+        prompt: The api cannot reach the database. Which line is wrong?
+        code: |
+          services:
+            api:
+              build: .
+              environment:
+                DATABASE_URL: postgres://app:secret@localhost:5432/app
+              depends_on:
+                - db
+            db:
+              image: postgres:17
+        bug_line: 5
+        explanation: In the api container localhost is the api itself. Compose puts both services on a default network where the hostname is the service name, so use @db:5432.
+        hint: What is localhost inside the api container?
+
+      - id: docker.compose.mcq-depends-on
+        type: mcq
+        prompt: "With `depends_on: [db]`, does Compose wait until Postgres accepts connections before starting api?"
+        options:
+          - text: No — it only waits for the db container to start; use depends_on with condition service_healthy and a healthcheck on db
+            correct: true
+            explanation: Container started ≠ service ready; Postgres needs a few seconds to accept connections.
+          - text: Yes, depends_on always waits for readiness
+            misconception: depends-on-waits-ready
+            explanation: Readiness is unknown to Compose without a healthcheck.
+          - text: depends_on is ignored by Compose v2
+            misconception: depends-on-ignored
+            explanation: It controls start and stop order.
+        explanation: Apps should still retry connections; healthchecks make startup ordering meaningful.
+        hint: How would Compose know Postgres is ready?
+
+      - id: docker.compose.cmd-logs-follow
+        type: command
+        prompt: Follow the logs of the api service only.
+        answers:
+          - docker compose logs -f api
+          - docker compose logs --follow api
+          - docker compose logs api -f
+          - docker compose logs api --follow
+        explanation: "`-f` streams new lines like tail -f; the service name filters the output."
+        hint: Same flag as tail.
+
+  - id: docker.security-ops
+    title: Image hygiene and operations
+    summary: >
+      Small, pinned, non-root images with no secrets baked in. Layers are
+      additive: deleting a file in a later layer does not shrink the image.
+    level: advanced
+    prereqs: [docker.compose]
+    lesson:
+      intro: "A production image should be small, reproducible and give an attacker little to work with: few packages, no root, no secrets inside."
+      example:
+        lang: dockerfile
+        code: |
+          FROM python:3.13-slim
+          RUN apt-get update \
+           && apt-get install -y --no-install-recommends \
+              curl \
+           && rm -rf /var/lib/apt/lists/*
+          RUN useradd --system --uid 10001 app
+          WORKDIR /app
+          COPY --chown=app . .
+          USER app
+          CMD ["python", "-m", "app"]
+      steps:
+        - text: An image is a stack of read-only layers, each one a diff over the last. Deleting a file in a later RUN only adds a whiteout entry; the bytes stay in the earlier layer.
+          predict:
+            prompt: Why is the cleanup joined to apt-get install with && in one RUN?
+            options:
+              - text: Docker cannot run rm in a separate RUN
+                explanation: rm works anywhere; in its own layer it just hides files that still take space below.
+              - text: The cache files never reach any layer
+                correct: true
+              - text: It only makes the build faster
+                explanation: The point is image size; a separate rm layer would not shrink anything.
+        - text: "Pin the base image by version tag or, for full reproducibility, by digest (image@sha256:…). latest can change under you. Minimal bases (slim, alpine, distroless) carry fewer packages and fewer CVEs."
+        - text: USER app runs the process without root, which limits the damage of a compromise or a container escape. Never use --privileged in production; it gives the container almost full access to the host.
+        - text: Secrets do not belong in ENV or ARG. Both are recorded in the image and its history (docker history, docker inspect). Pass them at runtime, or use RUN --mount=type=secret during the build.
+          predict:
+            prompt: A Dockerfile has ENV DB_PASSWORD=s3cret. Who can read it?
+            options:
+              - text: Anyone who can pull the image
+                correct: true
+              - text: Only processes inside running containers
+                explanation: ENV is stored in the image config, visible with docker inspect without running anything.
+        - text: docker exec starts an extra process in a running container. -i keeps stdin open and -t allocates a terminal; together they give you an interactive shell for debugging.
+      takeaway: "Clean up in the same RUN, pin small bases, run as non-root, keep secrets out of the image."
+    items:
+      - id: docker.security-ops.multi-hardening
+        type: multi
+        prompt: Which practices harden a production image?
+        options:
+          - text: Run as a non-root USER
+            correct: true
+            explanation: Limits the damage of a compromise or a container escape.
+          - text: Pin base images by version tag or digest
+            correct: true
+            explanation: Reproducible builds; latest can change under you.
+          - text: Use minimal bases (distroless, alpine, slim)
+            correct: true
+            explanation: Fewer packages means a smaller attack surface and fewer CVEs.
+          - text: Put the database password in an ENV instruction in the Dockerfile
+            misconception: secrets-in-image-ok
+            explanation: ENV values are stored in the image metadata and visible with docker history/inspect; pass secrets at runtime or with build secrets.
+          - text: Run with --privileged so permissions never get in the way
+            misconception: privileged-is-convenient
+            explanation: --privileged gives the container almost full access to the host.
+        explanation: Least privilege applies to containers just like to IAM.
+        hint: Which ones reduce what an attacker gets?
+
+      - id: docker.security-ops.mcq-layer-deletion
+        type: mcq
+        prompt: Why is the image still large after these two instructions?
+        code: |
+          RUN apt-get update && apt-get install -y build-essential
+          RUN rm -rf /var/lib/apt/lists/*
+        options:
+          - text: Each RUN is its own layer; the second layer only hides the files, which still exist in the first
+            correct: true
+            explanation: Clean up in the same RUN (`... && rm -rf /var/lib/apt/lists/*`) or use multi-stage builds.
+          - text: rm does not work inside Docker builds
+            misconception: rm-broken-in-build
+            explanation: rm works; the deleted files are just still in the earlier layer.
+          - text: The rm did shrink the image; the size shown is a stale build-cache number
+            misconception: later-layer-deletes-shrink
+            explanation: Size grows with each layer's content; later deletions add a whiteout, they do not subtract bytes.
+        explanation: Layers are additive diffs.
+        hint: Can a later layer modify an earlier one?
+
+      - id: docker.security-ops.cmd-exec-shell
+        type: command
+        prompt: Open an interactive sh shell inside the running container named web.
+        answers:
+          - docker exec -it web sh
+          - docker exec -ti web sh
+          - docker exec -it web /bin/sh
+          - docker exec -ti web /bin/sh
+          - docker exec -i -t web sh
+          - docker container exec -it web sh
+        explanation: "`exec` starts a new process in an existing container; `-i` keeps stdin open and `-t` allocates a terminal."
+        hint: You need stdin plus a TTY.

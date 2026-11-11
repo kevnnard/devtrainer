@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                        │ ▾ SESSION        1/1 · ✓0 ✗1
+ Go               ────────   0% │ Go › Slices                                      ○ new │ ✗ Slices                  Go
+  ▸ ○ Slices                    │ What does this print?                                  │
+                                │  1  s := make([]int, 2, 5)                             │ ▾ LAST 5 ANSWERS
+                                │  2  fmt.Println(len(s), cap(s))                        │ ✗   0 of 1
+                                │                                                        │ Mastery needs 4 of the last
+                                │ ┌─ ✗ Not quite ────── graded again · due Wed 11 Nov ─┐ │ 5 correct, over at least 2
+                                │ │                                                    │ │ days.
+                                │ │ - 5 5  your answer      make-len-is-cap · 1st time │ │
+                                │ │ + 2 5  expected                                    │ │ ▾ SCHEDULE    before → after
+                                │ │                                                    │ │ next due        new → Wed 11
+                                │ │ Why not                                            │ │ lapses                 0 → 0
+                                │ │   The second argument is the length; the third is  │ │ make-len-is-c… 1× in 30 days
+                                │ │   the capacity.                                    │ │
+                                │ │                                                    │ │ ▾ TUTOR               via pi
+                                │ │ Why this                                           │ │ e  explain deeper
+                                │ │   make([]T, len, cap).                             │ │ Sends the question, your
+                                │ │                                                    │ │ answer and the expected one.
+                                │ │ Takeaway                                           │ │ Everything else works
+                                │ │   A view over an array with length and capacity.   │ │ without it.
+                                │ │                                                    │ │
+                                │ │   enter  finish session     e  ask the tutor       │ │
+                                │ │                                                    │ │
+                                │ └────────────────────────────────────────────────────┘ │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+ ────────────────────────────── │                                                        │
+ ● █ mastered  ◑ ▓ review       │                                                        │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                        │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                     session [✗] 1/1 ✓0 ✗1 │ streak 1d │ Tue 10 Nov
+ go.slices.output-len · output · answered in 0:00          enter next · e ask the tutor · 1-4 screens · ? help · q quit

@@ -1,0 +1,1839 @@
+track:
+  id: javascript
+  title: JavaScript
+  description: Modern JavaScript on Node 22+ (ES2024) — coercion, scope and closures, this, prototypes, async and the event loop, modules and the classic interview traps.
+  order: 55
+
+concepts:
+  - id: javascript.values-coercion
+    title: Values, types and coercion
+    summary: >
+      JavaScript has seven primitive types plus objects. typeof has two famous
+      quirks (null, functions). + prefers strings, other math operators
+      convert to numbers, and == coerces while === does not.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: Every value is a primitive (string, number, bigint, boolean, undefined, symbol, null) or an object. Most surprises come from operators converting one type into another.
+      example:
+        lang: javascript
+        code: |
+          console.log(typeof null, typeof [], typeof undefined);
+          console.log(1 + "2", "3" * "4", true + 1);
+          console.log(0 == "", null == undefined, null == 0);
+          console.log(NaN === NaN, Number.isNaN(NaN));
+          console.log(0.1 + 0.2 === 0.3);
+      steps:
+        - text: "typeof null is \"object\", a bug kept since the first version of the language. Arrays are objects too, so typeof [] is also \"object\" (use Array.isArray). The line prints object object undefined."
+          predict:
+            prompt: What does typeof null give?
+            options:
+              - text: "\"null\""
+                explanation: There is no "null" result for typeof; null reports "object" for historical reasons.
+              - text: "\"object\""
+                correct: true
+              - text: "\"undefined\""
+                explanation: undefined and null are different values; only undefined reports "undefined".
+        - text: "If either side of + is a string, + concatenates: 1 + \"2\" is \"12\". Every other arithmetic operator converts to numbers: \"3\" * \"4\" is 12, and true + 1 is 2 because true becomes 1."
+          predict:
+            prompt: What is 1 + "2"?
+            options:
+              - text: "3"
+                explanation: With a string on either side, + concatenates instead of adding.
+              - text: NaN
+                explanation: Nothing fails to convert here; the number becomes the string "1".
+              - text: "\"12\""
+                correct: true
+        - text: "== converts before comparing: 0 == \"\" is true because \"\" becomes 0. null and undefined are == only to each other, so null == 0 is false. === never converts, which is why it is the default choice."
+        - text: "NaN is the only value not equal to itself, so NaN === NaN is false; test it with Number.isNaN. Numbers are 64-bit floats, so 0.1 + 0.2 is 0.30000000000000004 and the last line prints false."
+          predict:
+            prompt: What does 0.1 + 0.2 === 0.3 print?
+            options:
+              - text: "false"
+                correct: true
+              - text: "true"
+                explanation: 0.1 and 0.2 have no exact binary representation; their sum is 0.30000000000000004.
+      takeaway: Use === by default, Number.isNaN for NaN and Array.isArray for arrays; + with a string concatenates, other math converts to numbers.
+    items:
+      - id: javascript.values-coercion.output-typeof
+        type: output
+        prompt: What does this print?
+        code: |
+          console.log(typeof NaN, typeof function () {}, typeof 10n);
+        answers: ["number function bigint"]
+        explanation: NaN is a number value ("not a number" is still of type number). typeof reports "function" for callable objects, and 10n is a BigInt literal.
+        hint: Which type does NaN belong to?
+
+      - id: javascript.values-coercion.output-plus-minus
+        type: output
+        prompt: What does this print?
+        code: |
+          console.log([1, 2] + [3], "5" - 2, "5" + 2);
+        options:
+          - text: "1,23 3 52"
+            correct: true
+            explanation: Arrays become strings ("1,2" and "3") and + concatenates them. - only works on numbers, so "5" becomes 5. "5" + 2 concatenates.
+          - text: "[1, 2, 3] 3 7"
+            misconception: plus-concats-arrays
+            explanation: + never joins arrays; it converts both to strings. And "5" + 2 concatenates because one side is a string.
+          - text: "NaN 3 52"
+            misconception: array-plus-is-nan
+            explanation: Arrays convert to strings first ("1,2" and "3"), and two strings concatenate fine.
+          - text: "1,23 52 52"
+            misconception: minus-concats-strings
+            explanation: Only + has a string meaning; - always converts to numbers, so "5" - 2 is 3.
+        explanation: + concatenates as soon as one side is (or becomes) a string; -, *, / always convert to numbers.
+        hint: What does an array become when converted to a primitive?
+
+      - id: javascript.values-coercion.multi-falsy
+        type: multi
+        prompt: Which values are falsy (if (value) skips the block)?
+        options:
+          - text: "0"
+            correct: true
+          - text: "\"\" (empty string)"
+            correct: true
+          - text: NaN
+            correct: true
+          - text: "null"
+            correct: true
+          - text: "\"0\""
+            misconception: string-zero-falsy
+            explanation: Any non-empty string is truthy, including "0" and "false".
+          - text: "[] (empty array)"
+            misconception: empty-object-falsy
+            explanation: Every object is truthy, even an empty array or an empty object.
+          - text: "{} (empty object)"
+            misconception: empty-object-falsy
+            explanation: Every object is truthy, even when it has no properties.
+        explanation: "The falsy values are false, 0, -0, 0n, \"\", null, undefined and NaN. Everything else is truthy."
+        hint: Is there any object that is falsy?
+
+      - id: javascript.values-coercion.mcq-eq-null
+        type: mcq
+        prompt: "Many style guides allow one == comparison: value == null. When is it true?"
+        options:
+          - text: Only when value is null or undefined
+            correct: true
+            explanation: null and undefined are == to each other and to nothing else, so this is a short way to test for both.
+          - text: When value is null, undefined, 0 or ""
+            misconception: null-loose-equals-falsy
+            explanation: null == 0 and null == "" are false; == null is not a falsy check.
+          - text: Only when value is null
+            misconception: loose-eq-is-strict
+            explanation: == treats undefined as equal to null; that is the point of using it here.
+        explanation: value == null is equivalent to value === null || value === undefined. The ?? operator uses the same rule.
+        hint: Which two values are == to each other and to nothing else?
+
+      - id: javascript.values-coercion.code-sum-prices
+        type: code
+        language: javascript
+        prompt: The prices arrive as strings. Fix the loop so the program prints their numeric total, 17.5.
+        starter: |
+          const prices = ["10", "5", "2.5"];
+          let total = 0;
+          for (const price of prices) {
+            total = total + price;
+          }
+          console.log(total);
+        solution: |
+          const prices = ["10", "5", "2.5"];
+          let total = 0;
+          for (const price of prices) {
+            total = total + Number(price);
+          }
+          console.log(total);
+        expected: |
+          17.5
+        explanation: With a string on either side, + concatenates, so the starter builds "01052.5". Number(price) converts each string first (parseFloat would work too); then + adds.
+        hint: What does 0 + "10" give?
+
+  - id: javascript.scope-hoisting
+    title: Scope, hoisting and let/const
+    summary: >
+      var is function-scoped and hoisted as undefined. let and const are
+      block-scoped and sit in the temporal dead zone until their line runs.
+      Function declarations are hoisted with their body.
+    level: beginner
+    prereqs: [javascript.values-coercion]
+    lesson:
+      intro: Before running a scope, JavaScript registers every declaration in it. What you can see before the declaration's line depends on how it was declared.
+      example:
+        lang: javascript
+        code: |
+          console.log(a);
+          var a = 1;
+          try { console.log(b); } catch (e) { console.log(e.name); }
+          let b = 2;
+          console.log(sum(2, 3));
+          function sum(x, y) { return x + y; }
+          if (true) { var v = "var"; let l = "let"; }
+          console.log(v, typeof l);
+      steps:
+        - text: var a is hoisted and initialized to undefined, so the first line prints undefined instead of failing. Only the declaration moves up; the = 1 still happens on line 2.
+          predict:
+            prompt: What does the first console.log(a) print?
+            options:
+              - text: ReferenceError
+                explanation: var declarations exist from the start of their scope, holding undefined.
+              - text: undefined
+                correct: true
+              - text: "1"
+                explanation: The assignment = 1 runs on line 2, after the log.
+        - text: let b is hoisted too, but it stays uninitialized until its line runs. That window is the temporal dead zone (TDZ), and reading it throws, so the catch prints ReferenceError.
+          predict:
+            prompt: Reading b before let b = 2 runs gives…
+            options:
+              - text: undefined, like var
+                explanation: let is not initialized until its declaration runs; reading it before throws.
+              - text: A ReferenceError
+                correct: true
+        - text: A function declaration is hoisted with its body, so sum can be called before its line and prints 5. A function expression (const sum = …) would be in the TDZ instead.
+        - text: "var ignores blocks: v belongs to the whole function (or script), so it is visible after the if. let and const live only inside the { } where they are declared, so typeof l is \"undefined\". The line prints var undefined."
+        - text: const forbids reassigning the binding, not changing the value. const arr = []; arr.push(1) is fine; arr = [] throws TypeError.
+      takeaway: Prefer const, then let; var is function-scoped and hoisted as undefined, let/const are block-scoped with a TDZ.
+    items:
+      - id: javascript.scope-hoisting.output-var-hoist
+        type: output
+        prompt: What does this print?
+        code: |
+          function f() {
+            console.log(x);
+            var x = 5;
+          }
+          f();
+        options:
+          - text: undefined
+            correct: true
+            explanation: The declaration var x is hoisted to the top of f and set to undefined; the assignment stays on its line.
+          - text: "5"
+            misconception: hoisting-moves-assignment
+            explanation: Hoisting moves the declaration, not the = 5.
+          - text: "ReferenceError: x is not defined"
+            misconception: var-has-tdz
+            explanation: Only let, const and class have a temporal dead zone; var is readable as undefined.
+        explanation: Inside f, var x exists from the first line, holding undefined until line 3 runs.
+        hint: What does hoisting move, the declaration or the assignment?
+
+      - id: javascript.scope-hoisting.output-block-shadow
+        type: output
+        prompt: What does this print?
+        code: |
+          let x = 1;
+          {
+            let x = 2;
+            console.log(x);
+          }
+          console.log(x);
+        answers: ["2\n1"]
+        explanation: The inner let x is a new variable scoped to the block; it shadows the outer one there and disappears at the closing brace.
+        hint: How many variables named x exist?
+
+      - id: javascript.scope-hoisting.mcq-tdz
+        type: mcq
+        prompt: What happens when code reads a let variable on a line before its declaration, in the same scope?
+        options:
+          - text: It throws a ReferenceError, because the variable is in its temporal dead zone
+            correct: true
+            explanation: let and const are hoisted but uninitialized until their declaration runs.
+          - text: It reads undefined
+            misconception: let-hoists-like-var
+            explanation: That is var. let and const throw when read before their declaration.
+          - text: It reads the variable from the enclosing scope
+            misconception: tdz-falls-through
+            explanation: The inner declaration already owns the name for the whole block, so the lookup does not continue outward; it throws.
+        explanation: The TDZ turns use-before-declare bugs into immediate errors.
+        hint: let is hoisted, but is it initialized?
+
+      - id: javascript.scope-hoisting.bug-const-accumulator
+        type: bug
+        prompt: "This throws TypeError: Assignment to constant variable. Which line must change?"
+        code: |
+          const total = 0;
+          for (const n of [1, 2, 3]) {
+            total += n;
+          }
+          console.log(total);
+        bug_line: 1
+        explanation: total is reassigned on every iteration, so it must be declared with let. const n is fine because for…of creates a new binding per iteration.
+        hint: Which variable is reassigned, and which is created fresh each time?
+
+      - id: javascript.scope-hoisting.code-loop-callbacks
+        type: code
+        language: javascript
+        prompt: Each callback should return the index it was created in, so the program prints 0 1 2. Change one declaration.
+        starter: |
+          const callbacks = [];
+          for (var i = 0; i < 3; i++) {
+            callbacks.push(() => i);
+          }
+          console.log(callbacks.map((fn) => fn()).join(" "));
+        solution: |
+          const callbacks = [];
+          for (let i = 0; i < 3; i++) {
+            callbacks.push(() => i);
+          }
+          console.log(callbacks.map((fn) => fn()).join(" "));
+        expected: |
+          0 1 2
+        explanation: var is function scoped, so the three arrows share one i, which is 3 when they run. let creates a fresh binding for every iteration of a for loop, so each arrow keeps its own value.
+        hint: Which declaration is block scoped and re-created per iteration?
+
+  - id: javascript.arrays-iteration
+    title: Arrays and iteration
+    summary: >
+      map, filter and reduce build new values; sort mutates and compares as
+      strings by default; toSorted returns a copy. for…of walks values,
+      for…in walks keys as strings.
+    level: beginner
+    prereqs: [javascript.values-coercion]
+    lesson:
+      intro: Array methods are the everyday tools of JavaScript. A few defaults, though, do not do what their names suggest.
+      example:
+        lang: javascript
+        code: |
+          const nums = [3, 1, 10, 2];
+          console.log([...nums].sort(), nums.toSorted((a, b) => a - b));
+          const total = nums.reduce((acc, n) => acc + n, 0);
+          console.log(total, nums.map(n => n * 2).filter(n => n > 4));
+          console.log(["1", "2", "3"].map(parseInt));
+          for (const i in ["a", "b"]) console.log(typeof i);
+          console.log(nums.at(-1), [NaN].includes(NaN), [NaN].indexOf(NaN));
+      steps:
+        - text: "sort() with no comparator converts elements to strings and compares them as text, so 10 lands before 2: [ 1, 10, 2, 3 ]. It also sorts in place, which is why the example sorts a copy. toSorted (ES2023) returns a sorted copy; (a, b) => a - b sorts numbers ascending."
+          predict:
+            prompt: What does [3, 1, 10, 2].sort() produce?
+            options:
+              - text: "[ 1, 2, 3, 10 ]"
+                explanation: That needs a numeric comparator; the default compares strings, and "10" < "2".
+              - text: "[ 1, 10, 2, 3 ]"
+                correct: true
+              - text: "[ 10, 3, 2, 1 ]"
+                explanation: sort is ascending by default; only the comparison is by string.
+        - text: reduce folds the array into one value, starting from the initial 0, giving 16. map and filter return new arrays and chain; here [6, 2, 20, 4] keeps [ 6, 20 ].
+        - text: "map calls its callback with (element, index, array), and parseInt takes (string, radix). So the calls are parseInt(\"1\", 0), parseInt(\"2\", 1) and parseInt(\"3\", 2): [ 1, NaN, NaN ]. Write map(s => parseInt(s, 10)) or map(Number)."
+          predict:
+            prompt: What does ["1", "2", "3"].map(parseInt) return?
+            options:
+              - text: "[ 1, 2, 3 ]"
+                explanation: map passes the index as a second argument, which parseInt reads as the radix.
+              - text: "[ 1, NaN, NaN ]"
+                correct: true
+        - text: for…in iterates property keys, and keys are always strings, so it prints string twice. Use for…of for values of arrays, strings, Maps and Sets.
+        - text: at(-1) reads from the end (2). includes uses SameValueZero and finds NaN; indexOf uses === and cannot, so it returns -1.
+      takeaway: "Give sort a comparator (or use toSorted), never pass parseInt straight to map, and loop arrays with for…of."
+    items:
+      - id: javascript.arrays-iteration.output-default-sort
+        type: output
+        prompt: What does this print?
+        code: |
+          console.log([10, 9, 1, 100].sort());
+        options:
+          - text: "[ 1, 10, 100, 9 ]"
+            correct: true
+            explanation: Without a comparator the elements are compared as strings, and "100" sorts before "9".
+          - text: "[ 1, 9, 10, 100 ]"
+            misconception: sort-numeric-default
+            explanation: The default order is by string; pass (a, b) => a - b for numbers.
+          - text: "[ 100, 10, 9, 1 ]"
+            misconception: sort-descending-default
+            explanation: sort is ascending; the surprise is the string comparison, not the direction.
+        explanation: Default sort compares UTF-16 strings. It is a classic interview trap and a real source of bugs.
+        hint: What type does sort compare by default?
+
+      - id: javascript.arrays-iteration.output-map-reduce
+        type: output
+        prompt: What does this print?
+        code: |
+          const words = ["a", "bb", "ccc"];
+          const lens = words.map(w => w.length);
+          console.log(lens.reduce((a, b) => a + b, 0), lens.join("-"));
+        answers: ["6 1-2-3"]
+        explanation: map gives [1, 2, 3]; reduce adds them from 0 to 6; join glues the elements with "-".
+        hint: map first, then fold.
+
+      - id: javascript.arrays-iteration.mcq-for-in
+        type: mcq
+        prompt: "for (const x in [\"a\", \"b\"]) console.log(x) prints…"
+        options:
+          - text: "\"0\" and \"1\": the keys, as strings"
+            correct: true
+            explanation: for…in walks enumerable property keys, which are strings even for arrays.
+          - text: "\"a\" and \"b\": the values"
+            misconception: for-in-gives-values
+            explanation: That is for…of. for…in gives keys.
+          - text: "0 and 1 as numbers"
+            misconception: array-keys-are-numbers
+            explanation: Property keys are strings; arrays are no exception.
+        explanation: Use for…of (or entries()) to iterate arrays; for…in is meant for object keys.
+        hint: in gives keys, of gives values.
+
+      - id: javascript.arrays-iteration.bug-median
+        type: bug
+        prompt: median([2, 10, 3]) returns 2 instead of 3. Which line is wrong?
+        code: |
+          function median(values) {
+            const sorted = values.sort();
+            const mid = Math.floor(sorted.length / 2);
+            return sorted[mid];
+          }
+        bug_line: 2
+        explanation: sort() compares strings, giving [10, 2, 3], so the middle is 2. It also mutates the caller's array. Use values.toSorted((a, b) => a - b).
+        hint: How does sort compare 10 and 2 by default?
+
+      - id: javascript.arrays-iteration.code-sort-numbers
+        type: code
+        language: javascript
+        prompt: Print the scores sorted from lowest to highest, then the original array unchanged.
+        starter: |
+          const scores = [40, 100, 9, 25];
+          const sorted = scores.sort();
+          console.log(sorted.join(" "));
+          console.log(scores.join(" "));
+        solution: |
+          const scores = [40, 100, 9, 25];
+          const sorted = scores.toSorted((a, b) => a - b);
+          console.log(sorted.join(" "));
+          console.log(scores.join(" "));
+        expected: |
+          9 25 40 100
+          40 100 9 25
+        explanation: "sort() without a comparator compares elements as strings (\"100\" < \"25\" < \"40\" < \"9\") and sorts the array in place. A comparator (a, b) => a - b sorts numerically, and toSorted (ES2023) returns a new array, leaving scores untouched; [...scores].sort((a, b) => a - b) works too."
+        hint: Two problems — how sort compares by default, and whether it changes the array.
+
+  - id: javascript.destructuring-spread
+    title: Destructuring, spread and rest
+    summary: >
+      Destructuring unpacks arrays and objects, with defaults that apply only
+      to undefined. Spread copies one level deep; later properties win.
+      structuredClone makes a deep copy.
+    level: beginner
+    prereqs: [javascript.arrays-iteration]
+    lesson:
+      intro: Destructuring takes values out of arrays and objects; spread puts them into new ones. Both are shallow.
+      example:
+        lang: javascript
+        code: |
+          const user = { name: "Ana", address: { city: "Lima" }, tags: ["a"] };
+          const { name, age = 30, address: { city } } = user;
+          console.log(name, age, city);
+          const copy = { ...user, name: "Bea" };
+          copy.address.city = "Quito";
+          console.log(user.name, user.address.city);
+          const deep = structuredClone(user);
+          deep.tags.push("b");
+          console.log(user.tags.length);
+          const [first, , third = "none", ...rest] = [1, 2];
+          console.log(first, third, rest);
+          let x = 1, y = 2;
+          [x, y] = [y, x];
+          console.log(x, y);
+      steps:
+        - text: "Object destructuring matches by name. age is missing, so its default 30 applies, and address: { city } reaches into the nested object. It prints Ana 30 Lima."
+        - text: "Spread copies only the top level. copy gets its own name, but copy.address is the same object as user.address, so changing the city changes it for both."
+          predict:
+            prompt: What does the second console.log print?
+            options:
+              - text: Ana Lima
+                explanation: The copy shares the nested address object with user.
+              - text: Bea Quito
+                explanation: name was overridden only in copy; user keeps "Ana".
+              - text: Ana Quito
+                correct: true
+        - text: structuredClone copies deeply, so pushing into deep.tags leaves user.tags alone and the line prints 1.
+        - text: "Array destructuring matches by position. A hole (, ,) skips an element, a default fills a missing one, and ...rest collects what is left. With [1, 2]: first is 1, third falls back to \"none\", rest is []."
+          predict:
+            prompt: What is third?
+            options:
+              - text: "\"none\""
+                correct: true
+              - text: "2"
+                explanation: The empty slot skipped 2; third is position three, which is missing.
+              - text: undefined
+                explanation: A default replaces a missing (undefined) value.
+        - text: Destructuring assignment swaps without a temporary variable, so the last line prints 2 1.
+      takeaway: Defaults apply only to undefined; spread and destructuring are shallow (structuredClone for deep copies); later spread properties win.
+    items:
+      - id: javascript.destructuring-spread.output-defaults-null
+        type: output
+        prompt: What does this print?
+        code: |
+          const { a = 1, b = 2, c = 3 } = { a: null, b: undefined };
+          console.log(a, b, c);
+        options:
+          - text: "null 2 3"
+            correct: true
+            explanation: Defaults apply when the value is undefined, whether missing (c) or explicit (b). null is a real value.
+          - text: "1 2 3"
+            misconception: default-on-null
+            explanation: null does not trigger a default; only undefined does.
+          - text: "null undefined 3"
+            misconception: default-only-when-missing
+            explanation: An explicit undefined triggers the default just like a missing property.
+        explanation: Destructuring defaults, default parameters and ?? differ here; ?? replaces both null and undefined.
+        hint: Which value triggers a default?
+
+      - id: javascript.destructuring-spread.output-spread-order
+        type: output
+        prompt: What does this print?
+        code: |
+          const defaults = { theme: "light", size: 12 };
+          const opts = { size: 16 };
+          console.log({ ...opts, ...defaults }.size, { ...defaults, ...opts }.size);
+        answers: ["12 16"]
+        explanation: Spread copies properties in order and later ones overwrite earlier ones. To let options override defaults, spread defaults first.
+        hint: Which spread comes last?
+
+      - id: javascript.destructuring-spread.cloze-rest-params
+        type: cloze
+        prompt: "Collect every argument into an array: function sum(___nums) { return nums.reduce((a, b) => a + b, 0); }"
+        answers: ["..."]
+        explanation: A rest parameter (...nums) gathers the remaining arguments into a real array. It must be the last parameter.
+        hint: The same three characters as spread.
+
+      - id: javascript.destructuring-spread.mcq-shallow
+        type: mcq
+        prompt: "const b = [...a] where a = [{ n: 1 }]. Then b[0].n = 2. What is a[0].n?"
+        options:
+          - text: "2"
+            correct: true
+            explanation: Spread copies the array but not the objects inside it; a[0] and b[0] are the same object.
+          - text: "1"
+            misconception: spread-deep-copies
+            explanation: Spread is shallow. Use structuredClone(a) for an independent deep copy.
+          - text: It throws, because spread elements are frozen
+            misconception: spread-freezes
+            explanation: Spread does not freeze anything; Object.freeze does, and only one level deep.
+        explanation: Shallow copies share nested objects. That is fine for immutable updates, surprising for mutation.
+        hint: How many { n } objects exist?
+
+      - id: javascript.destructuring-spread.code-merge-defaults
+        type: code
+        language: javascript
+        prompt: Options passed by the caller must override the defaults. Fix the merge.
+        starter: |
+          const defaults = { retries: 3, verbose: false, timeout: 1000 };
+          function configure(options = {}) {
+            const config = { ...options, ...defaults };
+            const { retries, ...rest } = config;
+            return `${retries} ${JSON.stringify(rest)}`;
+          }
+          console.log(configure({ verbose: true }));
+          console.log(configure());
+        solution: |
+          const defaults = { retries: 3, verbose: false, timeout: 1000 };
+          function configure(options = {}) {
+            const config = { ...defaults, ...options };
+            const { retries, ...rest } = config;
+            return `${retries} ${JSON.stringify(rest)}`;
+          }
+          console.log(configure({ verbose: true }));
+          console.log(configure());
+        expected: |
+          3 {"verbose":true,"timeout":1000}
+          3 {"verbose":false,"timeout":1000}
+        explanation: In an object spread the last property with a name wins, so defaults must come first and options last. The rest pattern ...rest collects every property not destructured by name (here all but retries).
+        hint: When two spreads have the same key, which one wins?
+
+  - id: javascript.closures
+    title: Closures
+    summary: >
+      A function keeps access to the variables of the scope where it was
+      created. Each call creates new variables; let in a loop creates one per
+      iteration, var only one.
+    level: intermediate
+    prereqs: [javascript.scope-hoisting]
+    lesson:
+      intro: A closure is a function plus the variables it could see when it was created. It keeps those variables alive and reads their current value when it runs.
+      example:
+        lang: javascript
+        code: |
+          function counter() {
+            let count = 0;
+            return () => ++count;
+          }
+          const a = counter();
+          const b = counter();
+          a(); a();
+          console.log(a(), b());
+
+          const fs = [];
+          for (var i = 0; i < 3; i++) fs.push(() => i);
+          const gs = [];
+          for (let j = 0; j < 3; j++) gs.push(() => j);
+          console.log(fs.map(f => f()), gs.map(g => g()));
+      steps:
+        - text: Each call to counter() creates a new count variable. The returned arrow keeps it alive after counter has returned; nothing outside can touch it, which makes closures a way to keep private state.
+        - text: a was called twice, so its third call returns 3. b has its own count, so its first call returns 1.
+          predict:
+            prompt: What does console.log(a(), b()) print?
+            options:
+              - text: "3 4"
+                explanation: a and b come from separate counter() calls, so they do not share count.
+              - text: "3 1"
+                correct: true
+              - text: "1 1"
+                explanation: a's count survived the two earlier calls; closures keep state between calls.
+        - text: "A closure captures the variable, not a copy of its value. var i is one variable for the whole loop, and by the time the arrows run it is 3."
+          predict:
+            prompt: What does fs.map(f => f()) give?
+            options:
+              - text: "[ 3, 3, 3 ]"
+                correct: true
+              - text: "[ 0, 1, 2 ]"
+                explanation: All three arrows share the single var i, which ended at 3.
+              - text: "[ 2, 2, 2 ]"
+                explanation: The loop stops when i < 3 fails, so i ends at 3, not 2.
+        - text: let in a for header creates a fresh binding for each iteration, so each arrow sees its own j, giving [ 0, 1, 2 ].
+      takeaway: Closures capture variables, not values; every call (and every let loop iteration) gets fresh ones.
+    items:
+      - id: javascript.closures.output-var-timeout
+        type: output
+        prompt: What does this print?
+        code: |
+          for (var i = 0; i < 3; i++) {
+            setTimeout(() => console.log(i), 0);
+          }
+        answers: ["3\n3\n3"]
+        explanation: The callbacks run after the loop finishes, and they all share the single var i, which is 3 by then. Change var to let to print 0, 1, 2.
+        hint: How many i variables are there, and what is i when the timers fire?
+
+      - id: javascript.closures.output-private-state
+        type: output
+        prompt: What does this print?
+        code: |
+          function makeBank() {
+            let balance = 0;
+            return { deposit(n) { balance += n; }, read: () => balance };
+          }
+          const acct = makeBank();
+          acct.deposit(50);
+          acct.balance = 1000;
+          console.log(acct.read(), acct.balance);
+        options:
+          - text: "50 1000"
+            correct: true
+            explanation: balance is a closed-over variable, not a property. Setting acct.balance only adds a new, unrelated property.
+          - text: "1000 1000"
+            misconception: closure-var-is-property
+            explanation: The variable balance and the property acct.balance are different things; read() sees only the variable.
+          - text: "50 undefined"
+            misconception: cannot-add-properties
+            explanation: Plain objects accept new properties, so acct.balance is 1000.
+        explanation: Closures give real privacy; code outside makeBank has no way to reach balance.
+        hint: Is balance a property of the returned object?
+
+      - id: javascript.closures.mcq-captures-what
+        type: mcq
+        prompt: What does a closure capture from its outer scope?
+        options:
+          - text: The variables themselves, so it sees later changes to them
+            correct: true
+            explanation: The closure holds a reference to the scope; reading a variable gives its current value.
+          - text: A snapshot of each variable's value at creation time
+            misconception: closure-captures-value
+            explanation: That is why the var loop prints 3, 3, 3; the value is read when the function runs.
+          - text: Only variables declared with const
+            misconception: closure-const-only
+            explanation: Closures capture any variable in scope, whether var, let, const or a parameter.
+        explanation: Closures bind to variables, so a variable shared by several closures is seen by all of them.
+        hint: Think of the var loop with timers.
+
+      - id: javascript.closures.parsons-once
+        type: parsons
+        prompt: Order the lines of once(fn), which runs fn on the first call and returns the cached result afterwards.
+        lines:
+          - "function once(fn) {"
+          - "  let done = false, result;"
+          - "  return (...args) => {"
+          - "    if (!done) { done = true; result = fn(...args); }"
+          - "    return result;"
+          - "  };"
+          - "}"
+        explanation: done and result live in once's scope, so they persist between calls of the returned arrow and stay private to it.
+        hint: The state is declared before the function that uses it is returned.
+
+      - id: javascript.closures.code-private-counter
+        type: code
+        language: javascript
+        prompt: Every counter must keep its own private count, so the program prints 3 1. Move one line.
+        starter: |
+          let count = 0;
+          function makeCounter() {
+            return () => ++count;
+          }
+          const a = makeCounter();
+          const b = makeCounter();
+          a();
+          a();
+          console.log(a(), b());
+        solution: |
+          function makeCounter() {
+            let count = 0;
+            return () => ++count;
+          }
+          const a = makeCounter();
+          const b = makeCounter();
+          a();
+          a();
+          console.log(a(), b());
+        expected: |
+          3 1
+        explanation: A closure captures the variables of the scope where the function was created. With count declared inside makeCounter, each call creates a new count that only its returned arrow can reach; at module level every counter shares one variable.
+        hint: Where does each call of makeCounter get a variable of its own?
+
+  - id: javascript.this-arrows
+    title: this, bind and arrow functions
+    summary: >
+      In a regular function, this is decided by how it is called, not where it
+      is defined. Arrow functions have no this of their own; they use the one
+      of the surrounding code. bind fixes this permanently.
+    level: intermediate
+    prereqs: [javascript.closures]
+    lesson:
+      intro: "this is a hidden parameter. For obj.method() it is obj; for a plain call it is undefined in strict code (class bodies and modules are always strict)."
+      example:
+        lang: javascript
+        code: |
+          class Timer {
+            ticks = 0;
+            tick() { return ++this.ticks; }
+            tickTwice() { return [1, 2].map(() => this.tick()); }
+          }
+          const t = new Timer();
+          console.log(t.tick());
+          const loose = t.tick;
+          try { loose(); } catch (e) { console.log(e.name); }
+          console.log(t.tick.bind(t)());
+          console.log(t.tickTwice());
+      steps:
+        - text: t.tick() is a method call, so this is t and the first log prints 1.
+        - text: "const loose = t.tick copies only the function. Calling loose() has no object before the dot, so this is undefined (class code is strict), and reading this.ticks throws a TypeError."
+          predict:
+            prompt: What does loose() do?
+            options:
+              - text: Returns 2, because tick was defined in Timer
+                explanation: this is set at call time; where the function was written does not matter.
+              - text: Throws a TypeError
+                correct: true
+              - text: Returns NaN, using the global object as this
+                explanation: Non-strict plain functions would get globalThis, but class bodies are strict, so this is undefined.
+        - text: bind returns a new function whose this is fixed to t forever, so it prints 2. call(t, …) and apply(t, [ … ]) set this for a single call instead.
+        - text: The arrow inside map has no this of its own; it uses tickTwice's this, which is t. A function () {} callback there would get undefined and throw.
+          predict:
+            prompt: What does t.tickTwice() return?
+            options:
+              - text: "[ 1, 2 ]"
+                explanation: ticks is already 2 from the earlier calls, so the next two are 3 and 4.
+              - text: "[ 3, 4 ]"
+                correct: true
+              - text: A TypeError
+                explanation: Arrows take this from the surrounding method, so this is t.
+      takeaway: this depends on the call site; use bind or an arrow when a method is passed as a callback, and never write methods as arrows on object literals.
+    items:
+      - id: javascript.this-arrows.output-call-site
+        type: output
+        prompt: What does this print?
+        code: |
+          "use strict";
+          function who() { return this === undefined ? "none" : this.name; }
+          const a = { name: "a", who };
+          const b = { name: "b", who: a.who };
+          console.log(a.who(), b.who(), who());
+        options:
+          - text: "a b none"
+            correct: true
+            explanation: this is whatever object comes before the dot at call time. The plain call has none, so in strict mode this is undefined.
+          - text: "a a none"
+            misconception: this-fixed-at-definition
+            explanation: b.who is the same function, but it is called on b, so this is b.
+          - text: "a b a"
+            misconception: this-remembers-last-object
+            explanation: Functions do not remember objects; a plain call gets undefined in strict mode.
+        explanation: For regular functions, only the call expression decides this.
+        hint: Look at what is before the dot in each call.
+
+      - id: javascript.this-arrows.output-arrow-in-method
+        type: output
+        prompt: What does this print?
+        code: |
+          class Counter {
+            count = 0;
+            add(list) {
+              list.forEach(n => { this.count += n; });
+              return this.count;
+            }
+          }
+          console.log(new Counter().add([1, 2, 3]));
+        answers: ["6"]
+        explanation: The arrow callback uses the this of add, which is the Counter instance, so each n is added to count.
+        hint: Where does an arrow function get its this?
+
+      - id: javascript.this-arrows.bug-detached-method
+        type: bug
+        prompt: "The last line throws TypeError: Cannot read properties of undefined. Which line causes it?"
+        code: |
+          class Button {
+            constructor(label) { this.label = label; }
+            handle() { return `clicked ${this.label}`; }
+          }
+          const b = new Button("ok");
+          const onClick = b.handle;
+          console.log(onClick());
+        bug_line: 6
+        explanation: Reading b.handle without calling it loses the object. Use b.handle.bind(b), or () => b.handle(), or define handle as an arrow class field.
+        hint: When is this decided?
+
+      - id: javascript.this-arrows.cloze-call
+        type: cloze
+        prompt: "Run greet once with this set to user and the argument \"hi\": greet.___(user, \"hi\")"
+        answers: ["call"]
+        case_sensitive: true
+        explanation: call(thisArg, ...args) invokes immediately. apply takes the arguments as an array, and bind returns a new function instead of calling.
+        hint: Arguments passed one by one, invoked right away.
+
+      - id: javascript.this-arrows.code-callback-this
+        type: code
+        language: javascript
+        prompt: report() should label every value with this.label. Fix the callback so it keeps the method's this.
+        starter: |
+          const timer = {
+            label: "tick",
+            values: [1, 2],
+            report() {
+              return this.values.map(function (n) {
+                return `${this.label} ${n}`;
+              });
+            },
+          };
+          console.log(timer.report().join(", "));
+        solution: |
+          const timer = {
+            label: "tick",
+            values: [1, 2],
+            report() {
+              return this.values.map((n) => `${this.label} ${n}`);
+            },
+          };
+          console.log(timer.report().join(", "));
+        expected: |
+          tick 1, tick 2
+        explanation: A regular function gets its own this from how it is called; map calls it as a plain function, so in a module (strict mode) this is undefined and this.label throws a TypeError. An arrow function has no this of its own and uses report's this, which is timer.
+        hint: Which kind of function inherits this from the surrounding code?
+
+  - id: javascript.prototypes-classes
+    title: Prototypes and classes
+    summary: >
+      Objects inherit through a prototype chain that is searched at lookup
+      time. class is syntax over that chain: methods live on the prototype,
+      extends links prototypes, #fields are truly private.
+    level: intermediate
+    prereqs: [javascript.this-arrows]
+    lesson:
+      intro: When a property is not on an object, JavaScript looks at its prototype, then the prototype's prototype, up to null. Classes build exactly that chain.
+      example:
+        lang: javascript
+        code: |
+          const animal = { speak() { return `${this.name} makes a sound`; } };
+          const dog = Object.create(animal);
+          dog.name = "Rex";
+          console.log(dog.speak(), Object.hasOwn(dog, "speak"));
+
+          class Shape {
+            #id = 7;
+            constructor(name) { this.name = name; }
+            describe() { return `${this.name}#${this.#id}`; }
+          }
+          class Square extends Shape {
+            describe() { return "square " + super.describe(); }
+          }
+          const s = new Square("sq");
+          console.log(s.describe(), Object.getPrototypeOf(s) === Square.prototype, typeof Square);
+      steps:
+        - text: Object.create(animal) makes an empty object whose prototype is animal. dog.speak is not on dog, so the lookup finds it on animal, and this is still dog. Object.hasOwn is false because speak is inherited.
+          predict:
+            prompt: What does Object.hasOwn(dog, "speak") return?
+            options:
+              - text: "true"
+                explanation: dog can call speak, but the method lives on its prototype, not on dog itself.
+              - text: "false"
+                correct: true
+        - text: "class Shape creates a constructor function (typeof Square is \"function\") and puts describe on Shape.prototype, shared by every instance. #id is a private field: it exists only inside the class body and is not a property at all."
+        - text: extends makes Square.prototype inherit from Shape.prototype. Square has no constructor, so the default one passes name to Shape's. super.describe() calls the parent's version.
+          predict:
+            prompt: What does s.describe() return?
+            options:
+              - text: "\"square sq#7\""
+                correct: true
+              - text: "\"sq#7\""
+                explanation: Square overrides describe, and the lookup finds Square's version first.
+              - text: "A TypeError, because Square cannot read #id"
+                explanation: "The read happens inside Shape's describe, which belongs to the class that declared #id."
+        - text: The second line prints square sq#7 true function. A class declaration is in the TDZ until its line runs, unlike a function declaration.
+      takeaway: "Lookup walks the prototype chain at call time; class methods live on the prototype, and #fields are private to the class body."
+    items:
+      - id: javascript.prototypes-classes.output-live-prototype
+        type: output
+        prompt: What does this print?
+        code: |
+          function Person(name) { this.name = name; }
+          Person.prototype.greet = function () { return "hi " + this.name; };
+          const p = new Person("Lin");
+          Person.prototype.greet = function () { return "hey " + this.name; };
+          console.log(p.greet(), Object.hasOwn(p, "greet"));
+        answers: ["hey Lin false"]
+        explanation: p does not own greet; each call looks it up on Person.prototype, which now holds the new function.
+        hint: Is greet copied into p when it is created?
+
+      - id: javascript.prototypes-classes.output-private-field
+        type: output
+        prompt: What does this print?
+        code: |
+          class Safe { #pin = 1234; }
+          const s = new Safe();
+          console.log(s.pin, "#pin" in s, Object.keys(s).length);
+        options:
+          - text: "undefined false 0"
+            correct: true
+            explanation: "#pin is not a property: s.pin is an unrelated missing property, \"#pin\" is just a string key that does not exist, and Object.keys sees nothing."
+          - text: "1234 true 1"
+            misconception: private-is-convention
+            explanation: "# is real language-level privacy, not a naming convention like _pin."
+          - text: "undefined true 1"
+            misconception: private-is-hidden-property
+            explanation: Private fields are not properties at all, so neither in with a string nor Object.keys can see them.
+        explanation: Outside the class, a private field cannot even be named; writing s.#pin there is a SyntaxError.
+        hint: "Is a #field a property?"
+
+      - id: javascript.prototypes-classes.mcq-class-methods
+        type: mcq
+        prompt: Where does a method declared in a class body (not a field) live?
+        options:
+          - text: On ClassName.prototype, shared by all instances
+            correct: true
+            explanation: Instances find it through the prototype chain; there is one function for all of them.
+          - text: Copied onto every instance by the constructor
+            misconception: class-copies-methods
+            explanation: Only class fields (including arrow-function fields) are created per instance.
+          - text: On the class function itself, like a static method
+            misconception: methods-are-static
+            explanation: Only methods marked static live on the class function.
+        explanation: Methods on the prototype save memory; arrow fields cost one function per instance but keep this bound.
+        hint: Think of Person.prototype.greet.
+
+      - id: javascript.prototypes-classes.bug-super-order
+        type: bug
+        prompt: "new Child(\"x\") throws ReferenceError: Must call super constructor in derived class before accessing 'this'. Which line is wrong?"
+        code: |
+          class Base { constructor() { this.ready = true; } }
+          class Child extends Base {
+            constructor(name) {
+              this.name = name;
+              super();
+            }
+          }
+          new Child("x");
+        bug_line: 4
+        explanation: In a derived class, this does not exist until super() has run the parent constructor. Call super() first, then assign.
+        hint: Who creates the object in a derived class?
+
+      - id: javascript.prototypes-classes.code-subclass-super
+        type: code
+        language: javascript
+        prompt: Rect must reuse Shape's constructor to set its name to "rect". Complete its constructor.
+        starter: |
+          class Shape {
+            constructor(name) {
+              this.name = name;
+            }
+            area() {
+              return 0;
+            }
+            describe() {
+              return `${this.name}: ${this.area()}`;
+            }
+          }
+
+          class Rect extends Shape {
+            constructor(w, h) {
+              this.w = w;
+              this.h = h;
+            }
+            area() {
+              return this.w * this.h;
+            }
+          }
+
+          for (const shape of [new Shape("dot"), new Rect(2, 3)]) {
+            console.log(shape.describe());
+          }
+          console.log(Object.getPrototypeOf(Rect.prototype) === Shape.prototype);
+        solution: |
+          class Shape {
+            constructor(name) {
+              this.name = name;
+            }
+            area() {
+              return 0;
+            }
+            describe() {
+              return `${this.name}: ${this.area()}`;
+            }
+          }
+
+          class Rect extends Shape {
+            constructor(w, h) {
+              super("rect");
+              this.w = w;
+              this.h = h;
+            }
+            area() {
+              return this.w * this.h;
+            }
+          }
+
+          for (const shape of [new Shape("dot"), new Rect(2, 3)]) {
+            console.log(shape.describe());
+          }
+          console.log(Object.getPrototypeOf(Rect.prototype) === Shape.prototype);
+        expected: |
+          dot: 0
+          rect: 6
+          true
+        explanation: A derived class has no this until super(...) runs the parent constructor, so touching this first throws a ReferenceError. describe() comes from Shape.prototype, but this.area() finds Rect's override first on the prototype chain.
+        hint: What must a derived constructor call before using this?
+
+  - id: javascript.errors
+    title: Errors and exceptions
+    summary: >
+      throw any value but always throw Error objects; try/catch/finally where
+      finally always runs; custom errors extend Error; cause chains the
+      original error.
+    level: intermediate
+    prereqs: [javascript.prototypes-classes]
+    lesson:
+      intro: Errors are objects with a name, a message and a stack. Throwing one unwinds the stack until a catch handles it; finally runs on the way out no matter what.
+      example:
+        lang: javascript
+        code: |
+          class NotFound extends Error { name = "NotFound"; }
+          function load(id) {
+            try {
+              if (id < 0) throw new NotFound(`no user ${id}`);
+              return "ok";
+            } finally {
+              console.log("cleanup");
+            }
+          }
+          try { load(-1); } catch (e) {
+            console.log(e instanceof NotFound, e instanceof Error, e.message);
+          }
+          const err = new Error("save failed", { cause: new Error("disk full") });
+          console.log(err.cause.message);
+      steps:
+        - text: NotFound extends Error, so it gets message and stack from Error and its own name. instanceof works for both the subclass and Error.
+        - text: "load(-1) throws inside try. The error leaves load, but finally runs first, so cleanup prints before the outer catch sees the error."
+          predict:
+            prompt: What prints first?
+            options:
+              - text: "true true no user -1"
+                explanation: finally runs while the error is leaving load, before any outer catch.
+              - text: cleanup
+                correct: true
+              - text: Nothing, because there is no catch inside load
+                explanation: finally does not need a catch; it runs whether try returns or throws.
+        - text: The outer catch receives the NotFound instance and prints true true no user -1.
+        - text: The cause option (ES2022) wraps a low-level error in a meaningful one without losing the original, so the last line prints disk full.
+        - text: You can throw strings or numbers, but they carry no stack trace and break instanceof checks. Always throw Error or a subclass.
+      takeaway: Throw Error subclasses, attach the original with cause, and put cleanup in finally because it always runs.
+    items:
+      - id: javascript.errors.output-finally-with-return
+        type: output
+        prompt: What does this print?
+        code: |
+          function f() {
+            try {
+              return "try";
+            } finally {
+              console.log("finally");
+            }
+          }
+          console.log(f());
+        answers: ["finally\ntry"]
+        explanation: The return value is computed, then finally runs (logging), then f actually returns "try" to the caller, which logs it.
+        hint: Does return skip finally?
+
+      - id: javascript.errors.output-return-in-finally
+        type: output
+        prompt: What does this print?
+        code: |
+          function g() {
+            try { throw new Error("boom"); }
+            catch (e) { return "caught"; }
+            finally { return "finally"; }
+          }
+          console.log(g());
+        options:
+          - text: finally
+            correct: true
+            explanation: A return in finally replaces whatever try or catch was returning or throwing.
+          - text: caught
+            misconception: finally-cannot-override
+            explanation: finally runs last, and its return wins. That is why returning from finally is discouraged.
+          - text: "Error: boom"
+            misconception: catch-rethrows
+            explanation: catch handled the error and returned; nothing escapes g.
+        explanation: A return (or throw) inside finally overrides the earlier outcome, even an exception. Linters flag it.
+        hint: Which block runs last?
+
+      - id: javascript.errors.mcq-throw-string
+        type: mcq
+        prompt: Why throw new Error("bad input") instead of throw "bad input"?
+        options:
+          - text: An Error carries a stack trace and works with instanceof and error tooling
+            correct: true
+            explanation: A string has no stack, so you lose where the failure came from.
+          - text: throw only accepts Error objects
+            misconception: throw-only-errors
+            explanation: throw accepts any value; it is just a bad idea to throw non-errors.
+          - text: Strings cannot be caught by catch
+            misconception: catch-only-errors
+            explanation: catch receives whatever was thrown, string or not.
+        explanation: Throw Error or a subclass, and add cause when wrapping another error.
+        hint: What does a string lack that an Error has?
+
+      - id: javascript.errors.cloze-cause
+        type: cloze
+        prompt: "Wrap a low-level error without losing it: throw new Error(\"save failed\", { ___: original })"
+        answers: ["cause"]
+        case_sensitive: true
+        explanation: The cause option stores the original error on err.cause, and Node prints it under the outer stack trace.
+        hint: The reason behind the error.
+
+      - id: javascript.errors.code-throw-validation
+        type: code
+        language: javascript
+        prompt: Invalid ages must reach the catch block as a ValidationError. Fix parseAge.
+        starter: |
+          class ValidationError extends Error {
+            constructor(message) {
+              super(message);
+              this.name = "ValidationError";
+            }
+          }
+
+          function parseAge(text) {
+            const n = Number(text);
+            if (!Number.isInteger(n) || n < 0) {
+              return new ValidationError(`bad age: ${text}`);
+            }
+            return n;
+          }
+
+          for (const input of ["42", "-1", "abc"]) {
+            try {
+              console.log("age", parseAge(input));
+            } catch (err) {
+              if (!(err instanceof ValidationError)) throw err;
+              console.log(`${err.name}: ${err.message}`);
+            }
+          }
+        solution: |
+          class ValidationError extends Error {
+            constructor(message) {
+              super(message);
+              this.name = "ValidationError";
+            }
+          }
+
+          function parseAge(text) {
+            const n = Number(text);
+            if (!Number.isInteger(n) || n < 0) {
+              throw new ValidationError(`bad age: ${text}`);
+            }
+            return n;
+          }
+
+          for (const input of ["42", "-1", "abc"]) {
+            try {
+              console.log("age", parseAge(input));
+            } catch (err) {
+              if (!(err instanceof ValidationError)) throw err;
+              console.log(`${err.name}: ${err.message}`);
+            }
+          }
+        expected: |
+          age 42
+          ValidationError: bad age: -1
+          ValidationError: bad age: abc
+        explanation: Creating an Error object does nothing by itself; returning it hands the caller an ordinary value that it prints as an "age". throw unwinds to the nearest catch, where instanceof picks the errors this code knows how to handle and rethrows the rest.
+        hint: Is constructing an Error the same as raising it?
+
+  - id: javascript.collections
+    title: Map, Set and WeakMap
+    summary: >
+      Object keys are always strings or symbols. Map takes any key by
+      identity and knows its size; Set keeps unique values; WeakMap holds
+      object keys without keeping them alive.
+    level: intermediate
+    prereqs: [javascript.destructuring-spread, logic.hashing]
+    lesson:
+      intro: Plain objects work as dictionaries only for string keys. Map, Set and WeakMap are the real hash-based collections.
+      example:
+        lang: javascript
+        code: |
+          const keyA = { id: 1 }, keyB = { id: 2 };
+          const obj = {};
+          obj[keyA] = "A"; obj[keyB] = "B";
+          console.log(Object.keys(obj), obj[keyA]);
+          const m = new Map([[keyA, "A"], [keyB, "B"]]);
+          console.log(m.get(keyA), m.size, m.has({ id: 1 }));
+          const s = new Set([1, 2, 2, "2", NaN, NaN]);
+          console.log(s.size, [...new Set("banana")].join(""));
+          const meta = new WeakMap([[keyA, "seen"]]);
+          console.log(meta.get(keyA), meta.size);
+          console.log(Object.groupBy([1, 2, 3, 4], n => (n % 2 ? "odd" : "even")));
+      steps:
+        - text: "Using an object as a property key converts it to the string \"[object Object]\". Both assignments write the same key, so the object has one key and obj[keyA] reads \"B\"."
+          predict:
+            prompt: What is obj[keyA]?
+            options:
+              - text: "\"A\""
+                explanation: keyB was converted to the same string key and overwrote it.
+              - text: "\"B\""
+                correct: true
+              - text: undefined
+                explanation: The lookup converts keyA to "[object Object]" too, and that key exists.
+        - text: "A Map keeps object keys as they are and compares them by identity. m.has({ id: 1 }) is false because that is a new object that only looks the same. The line prints A 2 false."
+        - text: A Set keeps one copy of each value using SameValueZero, so NaN counts once and 2 differs from "2". The size is 4, and a Set of a string's characters removes duplicates.
+          predict:
+            prompt: What is s.size?
+            options:
+              - text: "3"
+                explanation: The number 2 and the string "2" are different values.
+              - text: "5"
+                explanation: Set treats NaN as equal to NaN, so it is stored once.
+              - text: "4"
+                correct: true
+        - text: A WeakMap only takes objects (or non-registered symbols) as keys and does not stop them from being garbage-collected. In exchange it has no size and cannot be iterated, so meta.size is undefined.
+        - text: "Object.groupBy (ES2024) groups an iterable by a callback into a null-prototype object: { odd: [ 1, 3 ], even: [ 2, 4 ] }. Map.groupBy returns a Map. Node 22 also has Set methods such as union, intersection and difference."
+      takeaway: Use Map for non-string or dynamic keys, Set for uniqueness, WeakMap for metadata attached to objects you do not own.
+    items:
+      - id: javascript.collections.output-set-order
+        type: output
+        prompt: What does this print?
+        code: |
+          const s = new Set([3, 1, 3, 2, 1]);
+          console.log([...s].join(","), s.size);
+        answers: ["3,1,2 3"]
+        explanation: A Set drops duplicates and keeps the order of first insertion; it does not sort.
+        hint: Does a Set sort its values?
+
+      - id: javascript.collections.output-object-keys-strings
+        type: output
+        prompt: What does this print?
+        code: |
+          const counts = {};
+          counts[1] = "number";
+          counts["1"] = "string";
+          console.log(Object.keys(counts).length, counts[1]);
+        options:
+          - text: "1 string"
+            correct: true
+            explanation: Property keys are strings, so 1 becomes "1" and the second assignment overwrites the first.
+          - text: "2 number"
+            misconception: object-keys-keep-type
+            explanation: Objects cannot hold the number 1 and the string "1" as different keys; a Map can.
+          - text: "2 string"
+            misconception: object-keys-keep-type
+            explanation: There is only one key, "1"; the number is converted on both writes and the read.
+        explanation: If key types matter, use a Map, where 1 and "1" are different keys.
+        hint: What type are object keys?
+
+      - id: javascript.collections.output-map-identity
+        type: output
+        prompt: What does this print?
+        code: |
+          const m = new Map();
+          m.set([1], "array");
+          m.set(NaN, "nan");
+          console.log(m.get([1]), m.get(NaN));
+        options:
+          - text: "undefined nan"
+            correct: true
+            explanation: Each [1] literal is a new array, compared by identity. NaN matches NaN under SameValueZero.
+          - text: "array nan"
+            misconception: map-compares-contents
+            explanation: Map compares object keys by identity, not by contents; keep a reference to the same array to read it back.
+          - text: "array undefined"
+            misconception: nan-never-matches
+            explanation: Map and Set use SameValueZero, where NaN equals NaN.
+        explanation: Map keys use SameValueZero, which is === except that NaN equals NaN.
+        hint: Are two [1] literals the same object?
+
+      - id: javascript.collections.mcq-weakmap
+        type: mcq
+        prompt: You want to attach cached data to objects created by a library without causing a memory leak. What fits?
+        options:
+          - text: A WeakMap keyed by those objects
+            correct: true
+            explanation: An entry does not keep its key alive; when the object is collected, the entry goes too.
+          - text: A Map keyed by those objects
+            misconception: map-weak-refs
+            explanation: A Map holds its keys strongly, so the objects can never be collected while the Map lives.
+          - text: A WeakMap keyed by each object's id string
+            misconception: weakmap-any-key
+            explanation: WeakMap keys must be objects or non-registered symbols; strings are rejected with a TypeError.
+        explanation: WeakMap trades iteration and size for not extending its keys' lifetime.
+        hint: Which collection lets its keys be garbage-collected?
+
+      - id: javascript.collections.code-count-words
+        type: code
+        language: javascript
+        prompt: Count how many times each word appears, in first-seen order, then print how many distinct words there are.
+        starter: |
+          const words = ["b", "a", "b", "c", "a", "b"];
+          const counts = new Map();
+          for (const word of words) {
+            counts.set(word, 1);
+          }
+          console.log([...counts].map(([word, n]) => `${word}=${n}`).join(" "));
+          console.log(new Set(words).size);
+        solution: |
+          const words = ["b", "a", "b", "c", "a", "b"];
+          const counts = new Map();
+          for (const word of words) {
+            counts.set(word, (counts.get(word) ?? 0) + 1);
+          }
+          console.log([...counts].map(([word, n]) => `${word}=${n}`).join(" "));
+          console.log(new Set(words).size);
+        expected: |
+          b=3 a=2 c=1
+          3
+        explanation: set overwrites the value of an existing key, so the count must start from the current one; get returns undefined for a new key, and ?? 0 turns that into 0. A Map iterates its keys in insertion order, and a Set keeps each value once.
+        hint: Read the current count before writing the new one.
+
+  - id: javascript.modules-esm
+    title: Modules (ESM)
+    summary: >
+      ES modules use import/export, are strict, have their own scope and
+      support top-level await. Imports are live, read-only bindings. Node
+      picks ESM for .mjs or "type": "module".
+    level: intermediate
+    prereqs: [javascript.scope-hoisting]
+    lesson:
+      intro: 'Each ES module file has its own scope and runs once; other files see only what it exports. Node treats .mjs files, and .js files under "type": "module", as ES modules.'
+      example:
+        lang: javascript
+        code: |
+          // counter.mjs
+          export let count = 0;
+          export function inc() { count++; }
+          export default function hello() { return "hi"; }
+
+          // main.mjs
+          import hello, { count, inc } from "./counter.mjs";
+          import * as counter from "./counter.mjs";
+          inc();
+          console.log(hello(), count, counter.count);
+          const { readFile } = await import("node:fs/promises");
+          console.log(typeof readFile);
+      steps:
+        - text: A module has any number of named exports and at most one default export. Named imports use braces and the exact names; the default import takes whatever name you choose.
+        - text: Both import lines load the same module, and it runs only once. import * as counter gathers every export into a namespace object.
+        - text: Imports are live bindings, not copies. inc() changes count inside counter.mjs, and main sees the new value through both names, so it prints hi 1 1.
+          predict:
+            prompt: After inc(), what does main see as count?
+            options:
+              - text: "0, the value copied at import time"
+                explanation: ESM imports are live views of the exporting module's variable.
+              - text: "1"
+                correct: true
+        - text: Bindings are read-only on the importing side. count = 5 in main throws TypeError (assignment to constant variable); only counter.mjs can change it.
+          predict:
+            prompt: What does count += 1 in main.mjs do?
+            options:
+              - text: It throws a TypeError
+                correct: true
+              - text: It changes count for every module
+                explanation: Importers cannot assign to an imported binding; the exporter must provide a function such as inc.
+              - text: It creates a local copy set to 2
+                explanation: An import is not a local variable; assigning to it is an error.
+        - text: "import() loads a module at runtime and returns a promise. Modules allow top-level await, so main waits for it and prints function. Node's built-ins use the node: prefix."
+      takeaway: 'Imports are live and read-only, each module runs once, and ESM is chosen by .mjs or "type": "module".'
+    items:
+      - id: javascript.modules-esm.mcq-live-binding
+        type: mcq
+        prompt: "config.mjs has export let mode = \"dev\"; export function setProd() { mode = \"prod\"; }. app.mjs imports both, calls setProd(), then logs mode. What prints?"
+        options:
+          - text: prod
+            correct: true
+            explanation: An imported binding is a live view of the exporting module's variable.
+          - text: dev
+            misconception: import-copies-value
+            explanation: ESM imports are not copies. CommonJS require gives you whatever was exported at that moment, but import does not.
+          - text: It throws, because mode is read-only
+            misconception: exporter-cannot-reassign
+            explanation: Only the importing side is read-only; the module that declared mode can reassign it.
+        explanation: Live bindings are why ESM can export a value that changes over time.
+        hint: Who is allowed to reassign mode?
+
+      - id: javascript.modules-esm.cloze-namespace
+        type: cloze
+        prompt: "Import every export of utils.mjs as one object: import ___ as utils from \"./utils.mjs\";"
+        answers: ["*"]
+        explanation: import * as utils creates a read-only namespace object with one property per export (default included, as utils.default).
+        hint: The wildcard character.
+
+      - id: javascript.modules-esm.bug-assign-import
+        type: bug
+        prompt: "main.mjs throws TypeError: Assignment to constant variable. Which line is wrong?"
+        code: |
+          import { count, inc } from "./counter.mjs";
+          inc();
+          count += 1;
+          console.log(count);
+        bug_line: 3
+        explanation: Imported bindings are read-only in the importer. Change the value through a function exported by counter.mjs, like inc().
+        hint: Can an importer write to an imported binding?
+
+      - id: javascript.modules-esm.command-type-module
+        type: command
+        prompt: Using npm, set "type" to "module" in package.json so that Node treats .js files as ES modules.
+        answers: ["npm pkg set type=module"]
+        explanation: 'npm pkg set edits package.json fields. With "type": "module", .js files are ESM; .cjs files stay CommonJS.'
+        hint: npm pkg set field=value
+
+      - id: javascript.modules-esm.code-default-export
+        type: code
+        language: javascript
+        prompt: The module exports greet as its default export and add as a named export. Read greet from the namespace object correctly.
+        starter: |
+          const source = "export const add = (a, b) => a + b; export default function greet(name) { return 'hi ' + name; }";
+          const mod = await import("data:text/javascript," + encodeURIComponent(source));
+
+          const greet = mod.greet;
+          console.log(greet("ana"));
+          console.log(mod.add(2, 3));
+          console.log(Object.keys(mod).join(" "));
+        solution: |
+          const source = "export const add = (a, b) => a + b; export default function greet(name) { return 'hi ' + name; }";
+          const mod = await import("data:text/javascript," + encodeURIComponent(source));
+
+          const greet = mod.default;
+          console.log(greet("ana"));
+          console.log(mod.add(2, 3));
+          console.log(Object.keys(mod).join(" "));
+        expected: |
+          hi ana
+          5
+          add default
+        explanation: "A default export is stored under the name default, whatever the function is called inside the module; `import greet from \"./m.js\"` is short for reading default. Named exports keep their names. Dynamic import() returns a promise of that namespace object, and top-level await works in ES modules."
+        hint: Under which key does a default export live in the namespace?
+
+  - id: javascript.promises-async
+    title: Promises and async/await
+    summary: >
+      A promise is a placeholder for a future value. async functions always
+      return promises and await pauses only the function it is in.
+      Promise.all fails fast; allSettled reports every outcome.
+    level: intermediate
+    prereqs: [javascript.closures, javascript.errors]
+    lesson:
+      intro: A promise is pending, then fulfilled with a value or rejected with an error, once. await waits for one inside an async function, and rejections become exceptions you can catch.
+      example:
+        lang: javascript
+        code: |
+          const wait = (ms, v) => new Promise(res => setTimeout(() => res(v), ms));
+          async function main() {
+            const a = await wait(20, "a");
+            const [b, c] = await Promise.all([wait(20, "b"), wait(10, "c")]);
+            console.log(a, b, c);
+            const r = await Promise.allSettled([wait(5, 1), Promise.reject(new Error("x"))]);
+            console.log(r.map(x => x.status));
+            try { await Promise.reject(new Error("nope")); }
+            catch (e) { console.log("caught", e.message); }
+            console.log(await Promise.race([wait(30, "slow"), wait(5, "fast")]));
+          }
+          main();
+          console.log("sync first");
+      steps:
+        - text: main() runs until its first await and then returns a pending promise. The rest of the script continues, so sync first is the first line printed.
+          predict:
+            prompt: What is printed first?
+            options:
+              - text: a b c
+                explanation: main pauses at its first await; the caller keeps running without waiting.
+              - text: sync first
+                correct: true
+        - text: "Promise.all runs the waits concurrently and resolves with their results in input order, not finish order: b, then c, even though c finished first. It prints a b c."
+          predict:
+            prompt: "c resolves before b. What is [b, c]?"
+            options:
+              - text: "[\"c\", \"b\"]"
+                explanation: Promise.all keeps the order of its input array.
+              - text: "[\"b\", \"c\"]"
+                correct: true
+        - text: "allSettled never rejects; it reports each result as { status, value } or { status, reason }, here [ 'fulfilled', 'rejected' ]. Promise.all would have rejected as soon as one input rejected."
+        - text: Awaiting a rejected promise throws at that line, so a normal try/catch handles it and prints caught nope.
+        - text: race settles with the first promise to settle, so it prints fast. Promise.any waits for the first fulfillment and ignores rejections unless all reject.
+      takeaway: async functions return promises; await turns rejections into catchable exceptions; all keeps input order and fails fast, allSettled never rejects.
+    items:
+      - id: javascript.promises-async.output-async-returns-promise
+        type: output
+        prompt: What does this print?
+        code: |
+          async function getNum() { return 42; }
+          const x = getNum();
+          console.log(x instanceof Promise, typeof x);
+        options:
+          - text: "true object"
+            correct: true
+            explanation: An async function always returns a promise, here already fulfilled with 42. Promises are objects.
+          - text: "false number"
+            misconception: async-returns-value
+            explanation: Without await, the caller receives the promise, not 42.
+          - text: "true promise"
+            misconception: typeof-promise
+            explanation: typeof has no "promise" result; promises are objects.
+        explanation: Get the value with await getNum() or getNum().then(…).
+        hint: What does every async function return?
+
+      - id: javascript.promises-async.output-then-chain
+        type: output
+        prompt: What does this print?
+        code: |
+          Promise.resolve(1)
+            .then(x => x + 1)
+            .then(x => { throw new Error("at " + x); })
+            .then(() => console.log("skipped"))
+            .catch(e => { console.log(e.message); return 10; })
+            .then(x => console.log(x));
+        answers: ["at 2\n10"]
+        explanation: The throw rejects the chain, which skips .then handlers until .catch. catch returns 10, so the chain is fulfilled again and the last then logs 10.
+        hint: Does a chain stay rejected after catch returns a value?
+
+      - id: javascript.promises-async.bug-foreach-results
+        type: bug
+        prompt: fetchUser works and takes a few milliseconds, yet loadAll([1, 2]) resolves to []. Which line is the cause?
+        code: |
+          async function loadAll(ids) {
+            const results = [];
+            ids.forEach(async id => {
+              results.push(await fetchUser(id));
+            });
+            return results;
+          }
+        bug_line: 3
+        explanation: forEach does not wait for the promises its async callback returns, so loadAll returns before any push. Use return Promise.all(ids.map(fetchUser)), or for…of with await.
+        hint: Does forEach await its callback?
+
+      - id: javascript.promises-async.mcq-all-reject
+        type: mcq
+        prompt: await Promise.all([a(), b(), c()]) and b() rejects first. What happens?
+        options:
+          - text: The await throws b's error right away; a() and c() keep running but their results are discarded
+            correct: true
+            explanation: Promise.all rejects with the first rejection. Promises cannot be cancelled, so the other work continues.
+          - text: It waits for all three and returns the results of a and c
+            misconception: all-collects-partial
+            explanation: That is closer to Promise.allSettled, which reports every outcome.
+          - text: a() and c() are cancelled
+            misconception: promise-cancels
+            explanation: There is no promise cancellation; abort work explicitly with an AbortController signal.
+        explanation: Choose all when any failure should fail the whole operation, allSettled when partial results are useful.
+        hint: Is Promise.all fail-fast?
+
+      - id: javascript.promises-async.code-await-all
+        type: code
+        language: javascript
+        prompt: Load the three users concurrently and print their names, in id order.
+        starter: |
+          const fetchName = (id) => Promise.resolve(`user${id}`);
+
+          async function loadUser(id) {
+            const name = await fetchName(id);
+            return name.toUpperCase();
+          }
+
+          const users = [1, 2, 3].map((id) => loadUser(id));
+          console.log(users.join(", "));
+        solution: |
+          const fetchName = (id) => Promise.resolve(`user${id}`);
+
+          async function loadUser(id) {
+            const name = await fetchName(id);
+            return name.toUpperCase();
+          }
+
+          const users = await Promise.all([1, 2, 3].map((id) => loadUser(id)));
+          console.log(users.join(", "));
+        expected: |
+          USER1, USER2, USER3
+        explanation: An async function always returns a promise, so map gives an array of promises, printed as [object Promise]. Promise.all waits for all of them at once and resolves to their values in the order of the input array, not the order they finish.
+        hint: What does an async function return before you await it?
+
+  - id: javascript.event-loop
+    title: The event loop
+    summary: >
+      One thread runs your code. After the current script or callback ends,
+      all microtasks (promise reactions, await continuations) run before the
+      next macrotask (timers, I/O). Long synchronous work blocks everything.
+    level: advanced
+    prereqs: [javascript.promises-async]
+    lesson:
+      intro: "JavaScript runs one piece of code at a time. The loop repeats: take one task, run it to the end, then empty the microtask queue."
+      example:
+        lang: javascript
+        code: |
+          console.log("A");
+          setTimeout(() => console.log("B"), 0);
+          Promise.resolve().then(() => console.log("C"));
+          (async () => {
+            console.log("D");
+            await null;
+            console.log("E");
+          })();
+          console.log("F");
+      steps:
+        - text: "The whole script is the current task, so every synchronous line runs first. An async function's body runs synchronously until its first await, so D prints right away: A, D, F."
+          predict:
+            prompt: When does D print?
+            options:
+              - text: Right after A, before F
+                correct: true
+              - text: After F, with the promise callbacks
+                explanation: Calling an async function runs its body immediately, up to the first await.
+              - text: Last, after B
+                explanation: Only the code after await is deferred, and as a microtask, not a timer.
+        - text: ".then queued C as a microtask, and await null queued the rest of the async function (E) as another one. When the script ends, the microtask queue drains in order: C, then E."
+        - text: setTimeout(…, 0) queues a macrotask. It runs only after all microtasks, so B is last.
+          predict:
+            prompt: What is the full order?
+            options:
+              - text: A D F B C E
+                explanation: Timers wait until the microtask queue is empty.
+              - text: A D F C E B
+                correct: true
+              - text: A B C D E F
+                explanation: Callbacks never interrupt synchronous code.
+        - text: "In Node, process.nextTick has its own queue: after a CommonJS main script it runs before promise callbacks, while in an ES module the promise callbacks come first. setImmediate runs after the I/O phase of the loop. A while loop that takes 2 seconds delays every timer and every request by 2 seconds."
+      takeaway: Synchronous code first, then every microtask, then the next timer or I/O callback; never block the one thread.
+    items:
+      - id: javascript.event-loop.output-micro-vs-macro
+        type: output
+        prompt: What does this print?
+        code: |
+          setTimeout(() => console.log("timeout"), 0);
+          Promise.resolve().then(() => console.log("then"));
+          console.log("sync");
+        answers: ["sync\nthen\ntimeout"]
+        explanation: Synchronous code first; then the microtask (then) drains before the next macrotask (the 0 ms timer).
+        hint: Promise callbacks are microtasks; timers are macrotasks.
+
+      - id: javascript.event-loop.output-micro-inside-timer
+        type: output
+        prompt: What does this print?
+        code: |
+          setTimeout(() => {
+            console.log("t1");
+            Promise.resolve().then(() => console.log("p1"));
+          }, 0);
+          setTimeout(() => console.log("t2"), 0);
+        answers: ["t1\np1\nt2"]
+        explanation: After each macrotask (each timer callback) the microtask queue drains, so p1 runs before the second timer. It is not t1, t2, p1 — microtasks drain after every single task, not after a batch of timers (Node 11+ matches browsers here).
+        hint: When does the microtask queue drain?
+
+      - id: javascript.event-loop.mcq-blocking
+        type: mcq
+        prompt: setTimeout(fn, 100) is scheduled, then synchronous code keeps the thread busy for 500 ms. When does fn run?
+        options:
+          - text: After the synchronous code finishes, about 500 ms after scheduling
+            correct: true
+            explanation: The delay is a minimum. The callback waits until the thread is free.
+          - text: At 100 ms, interrupting the synchronous code
+            misconception: timer-interrupts
+            explanation: JavaScript never interrupts running code; callbacks run only between tasks.
+          - text: Never, because the timer expired while the thread was busy
+            misconception: timer-drops-if-late
+            explanation: Late timers are not dropped; they run as soon as the loop gets to them.
+        explanation: Long synchronous work delays every callback. Move CPU-heavy work to a worker_threads Worker.
+        hint: Can a callback interrupt running code?
+
+      - id: javascript.event-loop.multi-microtasks
+        type: multi
+        prompt: Which of these are queued as microtasks?
+        options:
+          - text: A .then callback of a fulfilled promise
+            correct: true
+          - text: The code after an await
+            correct: true
+          - text: A queueMicrotask callback
+            correct: true
+          - text: A setTimeout(fn, 0) callback
+            misconception: timeout-zero-is-microtask
+            explanation: Timers are macrotasks, even with a 0 ms delay; they wait for the microtask queue to empty.
+          - text: A setImmediate callback
+            misconception: immediate-is-microtask
+            explanation: setImmediate runs in Node's check phase, a macrotask, after pending microtasks.
+        explanation: Promise reactions, await continuations and queueMicrotask are microtasks; timers, setImmediate and I/O callbacks are macrotasks.
+        hint: Is it about promises?
+
+      - id: javascript.event-loop.code-microtask-first
+        type: code
+        language: javascript
+        prompt: "Schedule the second message so the output is in order: sync code, then a microtask, then the timer."
+        starter: |
+          setTimeout(() => console.log("3 timer"), 0);
+          setTimeout(() => console.log("2 microtask"), 0);
+          console.log("1 sync");
+        solution: |
+          setTimeout(() => console.log("3 timer"), 0);
+          queueMicrotask(() => console.log("2 microtask"));
+          console.log("1 sync");
+        expected: |
+          1 sync
+          2 microtask
+          3 timer
+        explanation: Synchronous code runs to the end first. Then the microtask queue (queueMicrotask, promise callbacks) is emptied before the event loop takes the next task, such as a timer. Two timers with the same delay run in the order they were scheduled, so the starter prints the timer first. Promise.resolve().then(...) is also a microtask.
+        hint: Which queue is drained before any timer fires?
+
+  - id: javascript.pitfalls
+    title: Classic pitfalls
+    summary: >
+      Interview favourites: == with objects and arrays, empty Math.max and
+      Math.min, float precision, safe integers and BigInt, indexOf in a
+      condition, and Date month overflow.
+    level: advanced
+    prereqs: [javascript.prototypes-classes, javascript.collections]
+    lesson:
+      intro: Each trap below follows from rules you already know. The point is to explain why, not to memorize the outputs.
+      example:
+        lang: javascript
+        code: |
+          console.log([1, 2, 3] == "1,2,3", [] == false, !![]);
+          console.log(Math.max(), Math.min(), [] + {});
+          const a = [1, 2, 3];
+          a.length = 0;
+          console.log(a, typeof a[0]);
+          console.log(0.1 + 0.2, (0.1 + 0.2).toFixed(2));
+          console.log(Number.MAX_SAFE_INTEGER + 2, 2n ** 64n);
+          const d = new Date(2024, 0, 31);
+          d.setMonth(1);
+          console.log(d.getMonth(), d.getDate());
+      steps:
+        - text: "== with an object and a primitive converts the object to a primitive: [1, 2, 3] becomes \"1,2,3\". [] == false becomes \"\" == 0, then 0 == 0, so true. Yet !![] is true, because every object is truthy."
+          predict:
+            prompt: What does [] == false give?
+            options:
+              - text: "true"
+                correct: true
+              - text: "false"
+                explanation: "Both sides get converted: [] to \"\", then both to the number 0."
+        - text: Math.max() with no arguments is -Infinity (the identity for max) and Math.min() is Infinity. [] + {} turns both into strings, "" and "[object Object]".
+        - text: Setting length to 0 truncates the array in place, so a prints [] and a[0] is undefined.
+        - text: "0.1 + 0.2 is 0.30000000000000004. Round only for display with toFixed, which returns the string \"0.30\". Compare floats with a tolerance; keep money in integer cents."
+        - text: Integers above Number.MAX_SAFE_INTEGER (2^53 - 1) lose precision, so adding 2 gives 9007199254740992, which is off by one. BigInt (the n suffix) is exact at any size.
+        - text: "Months are 0-based. setMonth(1) asks for February 31, which does not exist, so the Date rolls over to March 2, 2024 (a leap year): the line prints 2 2."
+          predict:
+            prompt: After setMonth(1) on January 31, 2024, what is the date?
+            options:
+              - text: February 29
+                explanation: Date does not clamp to the end of the month; the extra days roll into March.
+              - text: March 2
+                correct: true
+              - text: February 31
+                explanation: Date always normalizes impossible dates.
+      takeaway: "When output looks absurd, trace the conversion: object to primitive, then to number; floats are approximations; Date normalizes overflow."
+    items:
+      - id: javascript.pitfalls.output-array-not-array
+        type: output
+        prompt: What does this print?
+        code: |
+          console.log([] == ![]);
+        options:
+          - text: "true"
+            correct: true
+            explanation: "![] is false (objects are truthy). Then [] == false converts [] to \"\" and both sides to 0."
+          - text: "false"
+            misconception: loose-eq-is-strict
+            explanation: == converts both sides; without conversion it would be false, but this is ==, not ===.
+          - text: TypeError
+            misconception: loose-eq-throws
+            explanation: == never throws for these values; it converts until both sides have the same type.
+        explanation: A good reason to use === everywhere.
+        hint: Evaluate ![] first.
+
+      - id: javascript.pitfalls.output-float
+        type: output
+        prompt: What does this print?
+        code: |
+          console.log(0.1 + 0.2 === 0.3, (0.1 * 3).toFixed(1));
+        answers: ["false 0.3"]
+        explanation: "Binary floats cannot represent 0.1 exactly, so the sum is 0.30000000000000004. toFixed(1) rounds for display and returns the string \"0.3\"."
+        hint: Is 0.1 exact in binary?
+
+      - id: javascript.pitfalls.bug-indexof-condition
+        type: bug
+        prompt: hasAdmin(["admin", "dev"]) returns false. Which line is wrong?
+        code: |
+          function hasAdmin(roles) {
+            if (roles.indexOf("admin")) {
+              return true;
+            }
+            return false;
+          }
+        bug_line: 2
+        explanation: "\"admin\" is at index 0, which is falsy, while a missing value gives -1, which is truthy. Use roles.includes(\"admin\")."
+        hint: What does indexOf return for the first element, and is it truthy?
+
+      - id: javascript.pitfalls.mcq-big-ids
+        type: mcq
+        prompt: An API returns 64-bit IDs such as 9007199254740993 as JSON numbers. What happens after JSON.parse?
+        options:
+          - text: The ID may change silently, because numbers above 2^53 - 1 are not exact
+            correct: true
+            explanation: JSON.parse produces float64 numbers; 9007199254740993 becomes 9007199254740992. Send such IDs as strings, or convert them to BigInt.
+          - text: JSON.parse throws a RangeError
+            misconception: unsafe-int-throws
+            explanation: Nothing throws; the value is rounded silently, which is what makes this bug dangerous.
+          - text: The ID is parsed as a BigInt automatically
+            misconception: auto-bigint
+            explanation: JSON.parse never creates BigInts; you must convert a string yourself with BigInt(…).
+        explanation: Number.isSafeInteger tells you whether a number is still exact.
+        hint: What is Number.MAX_SAFE_INTEGER?
+
+      - id: javascript.pitfalls.code-parse-and-cents
+        type: code
+        language: javascript
+        prompt: Convert the ids to numbers and total the prices exactly. Fix both lines marked with a comment.
+        starter: |
+          const ids = ["10", "11", "12"].map(parseInt); // fix
+          console.log(ids.join(" "));
+
+          const prices = [0.1, 0.2];
+          const total = prices.reduce((sum, p) => sum + p, 0); // fix
+          console.log(total);
+        solution: |
+          const ids = ["10", "11", "12"].map((s) => Number.parseInt(s, 10));
+          console.log(ids.join(" "));
+
+          const prices = [0.1, 0.2];
+          const total = prices.reduce((sum, p) => sum + Math.round(p * 100), 0) / 100;
+          console.log(total);
+        expected: |
+          10 11 12
+          0.3
+        explanation: map passes (value, index, array), and parseInt reads the index as the radix, so "11" in base 1 is NaN and "12" in base 2 is 1. Pass the radix yourself. Floats cannot store 0.1 exactly, so the sum is 0.30000000000000004; adding whole cents and dividing once gives 0.3.
+        hint: What is the second argument map gives its callback, and what is parseInt's second parameter?
+
+sections:
+  - id: javascript/core
+    title: Core language
+    concepts: [javascript.values-coercion, javascript.scope-hoisting, javascript.arrays-iteration, javascript.destructuring-spread]
+  - id: javascript/functions-objects
+    title: Functions & objects
+    concepts: [javascript.closures, javascript.this-arrows, javascript.prototypes-classes, javascript.errors]
+  - id: javascript/data-modules-async
+    title: Data, modules & async
+    concepts: [javascript.collections, javascript.modules-esm, javascript.promises-async, javascript.event-loop, javascript.pitfalls]

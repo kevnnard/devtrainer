@@ -1,0 +1,636 @@
+track:
+  id: aws
+  title: AWS
+  description: Cloud fundamentals aligned with the Solutions Architect Associate (SAA-C03) domains — IAM, VPC, EC2 and scaling, S3, databases and the Well-Architected Framework.
+  order: 100
+
+concepts:
+  - id: aws.iam
+    title: IAM and least privilege
+    summary: >
+      IAM controls who (users, roles, services) can do what on which resources.
+      Policies are evaluated deny-by-default; an explicit Deny always wins.
+      Workloads use roles with temporary credentials, never long-lived keys.
+    level: beginner
+    prereqs: [architecture.coupling-cohesion]
+    lesson:
+      intro: IAM decides who can do what on which resource. Every request is denied until a policy allows it.
+      example:
+        lang: json
+        code: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [{
+              "Effect": "Allow",
+              "Action": "s3:GetObject",
+              "Resource": "arn:aws:s3:::reports/*"
+            }]
+          }
+      steps:
+        - text: This identity policy allows one action, s3:GetObject, on the objects of one bucket, reports.
+        - text: "IAM is deny by default: any action that no policy allows, such as s3:DeleteObject, is denied."
+          predict:
+            prompt: Can a role with only this policy delete objects in reports?
+            options:
+              - text: No, nothing allows s3:DeleteObject
+                correct: true
+              - text: Yes, it already has access to the bucket
+                explanation: Access is granted per action; only GetObject is allowed.
+        - text: "The evaluation order: an explicit Deny anywhere wins; otherwise some policy must Allow; otherwise the implicit deny applies."
+          predict:
+            prompt: Another policy explicitly denies s3:GetObject on reports/*. Can the role still read?
+            options:
+              - text: Yes, because the Allow was attached first
+                explanation: Order does not matter; an explicit Deny overrides every Allow.
+              - text: No, an explicit Deny always wins
+                correct: true
+        - text: Attach the policy to a role, not to a user with access keys. An EC2 instance or a Lambda function gets temporary credentials from its role.
+      takeaway: "Least privilege: deny by default, allow only what a task needs, and an explicit Deny always wins."
+    items:
+      - id: aws.iam.mcq-ec2-credentials
+        type: mcq
+        prompt: An application on EC2 needs to read one S3 bucket. What is the recommended way to give it access?
+        options:
+          - text: Attach an IAM role (instance profile) with a policy allowing s3:GetObject on that bucket only
+            correct: true
+            explanation: The SDK picks up automatically rotated temporary credentials from the instance metadata service.
+          - text: Create an IAM user and put its access keys in the app's config file
+            misconception: long-lived-keys-ok
+            explanation: Long-lived keys leak through repos, images and logs, and must be rotated by hand.
+          - text: Attach AdministratorAccess to the role so it never fails
+            misconception: broad-permissions-ok
+            explanation: It violates least privilege; a compromised instance could then do anything in the account.
+        explanation: Roles plus least-privilege policies are the default for any AWS compute (EC2, Lambda, ECS tasks).
+        hint: Which option has no secret to store?
+
+      - id: aws.iam.mcq-explicit-deny
+        type: mcq
+        prompt: An identity policy allows s3:* on a bucket, but an attached SCP explicitly denies s3:DeleteObject. Can the user delete objects?
+        options:
+          - text: No — an explicit Deny anywhere in the evaluation overrides any Allow
+            correct: true
+            explanation: Evaluation order is explicit deny → explicit allow → implicit deny.
+          - text: Yes, because the more specific identity policy wins
+            misconception: specific-allow-beats-deny
+            explanation: Specificity does not matter; any explicit Deny wins.
+          - text: Yes, SCPs only apply to the root user
+            misconception: scp-root-only
+            explanation: SCPs limit every principal in member accounts, including their root user; they do not apply to the management account.
+        explanation: Requests are denied by default; they need an Allow and no Deny.
+        hint: What always wins in IAM?
+
+      - id: aws.iam.cmd-whoami
+        type: command
+        prompt: Show which account and IAM identity your AWS CLI credentials belong to.
+        answers:
+          - aws sts get-caller-identity
+        explanation: STS returns the Account, UserId and Arn of the caller — the first command to run when debugging access.
+        hint: The Security Token Service answers "who is calling?".
+
+      - id: aws.iam.multi-best-practices
+        type: multi
+        prompt: Which are IAM best practices?
+        options:
+          - text: Enable MFA on the root user and do not use it for daily work
+            correct: true
+            explanation: Root has unrestricted access that cannot be limited by IAM policies.
+          - text: Prefer roles and federation (IAM Identity Center) over IAM users with access keys
+            correct: true
+            explanation: Temporary credentials expire automatically.
+          - text: Grant only the permissions a task needs
+            correct: true
+            explanation: Least privilege limits the blast radius of mistakes and compromises.
+          - text: Share one IAM user among the team to simplify management
+            misconception: shared-credentials-ok
+            explanation: Shared credentials destroy accountability in CloudTrail and cannot be revoked per person.
+        explanation: Identity is the first SAA-C03 security topic — least privilege and temporary credentials.
+        hint: Which option makes CloudTrail useless?
+
+  - id: aws.vpc
+    title: VPC networking
+    summary: >
+      A VPC is your private network, split into subnets per Availability Zone.
+      Public subnets route 0.0.0.0/0 to an internet gateway; private subnets
+      reach the internet through a NAT gateway. Security groups are stateful,
+      NACLs stateless.
+    level: intermediate
+    prereqs: [aws.iam, linux.networking]
+    lesson:
+      intro: A VPC is your private network in one region. You split its address range into subnets, each in one Availability Zone, and route tables decide where traffic goes.
+      example:
+        lang: text
+        code: |
+          VPC 10.0.0.0/16
+            public-a   10.0.1.0/24   us-east-1a
+              10.0.0.0/16  -> local
+              0.0.0.0/0    -> igw-1
+            private-a  10.0.2.0/24   us-east-1a
+              10.0.0.0/16  -> local
+              0.0.0.0/0    -> nat-1  (lives in public-a)
+      steps:
+        - text: Every route table has a local route, so all subnets in the VPC can reach each other. The 0.0.0.0/0 default route decides what happens to everything else.
+        - text: A subnet is public only because its route table sends 0.0.0.0/0 to an internet gateway (igw). Its name and its security groups do not matter. Instances there also need a public IP to be reachable.
+          predict:
+            prompt: You rename private-a to public-b. Is it public now?
+            options:
+              - text: Yes, once it is tagged public
+                explanation: Names are labels; only the route to an internet gateway makes a subnet public.
+              - text: No, it still routes 0.0.0.0/0 to a NAT gateway
+                correct: true
+        - text: "A NAT gateway sits in a public subnet. Private instances send their outbound traffic to it, so they can download updates, but nobody on the internet can open a connection to them. Use one NAT gateway per AZ for availability. To reach S3 or DynamoDB without the internet, add a VPC gateway endpoint."
+        - text: "AWS reserves the first four addresses and the last one in every subnet: the network address, the VPC router, DNS, one for future use, and broadcast."
+          predict:
+            prompt: How many usable addresses does a /26 subnet have?
+            options:
+              - text: "64"
+                explanation: A /26 has 2⁶ = 64 addresses, but AWS keeps some of them.
+              - text: "62"
+                explanation: That is classic networking (minus network and broadcast); AWS reserves three more.
+              - text: "59"
+                correct: true
+        - text: "Two firewalls. Security groups attach to network interfaces, have only allow rules and are stateful: replies to an allowed request pass automatically. Network ACLs apply to a whole subnet, have numbered allow and deny rules, and are stateless, so return traffic on ephemeral ports needs its own rule. Blocking one IP needs a NACL deny."
+      takeaway: "Public = route to an IGW; private subnets go out through a NAT gateway; SGs are stateful allow-only, NACLs stateless with deny."
+    items:
+      - id: aws.vpc.mcq-public-subnet
+        type: mcq
+        prompt: What makes a subnet "public"?
+        options:
+          - text: Its route table sends 0.0.0.0/0 to an internet gateway
+            correct: true
+            explanation: Instances there also need a public IP to be reachable.
+          - text: It has the word public in its name
+            misconception: subnet-name-matters
+            explanation: Names are labels; routing decides.
+          - text: Its security group allows all inbound traffic
+            misconception: sg-makes-public
+            explanation: Security groups filter traffic; without an IGW route nothing from the internet arrives.
+        explanation: Public vs private is purely a routing property.
+        hint: Look at the route table.
+
+      - id: aws.vpc.mcq-nat
+        type: mcq
+        prompt: Instances in a private subnet must download OS updates from the internet but must not be reachable from it. What do you add?
+        options:
+          - text: A NAT gateway in a public subnet, and a route 0.0.0.0/0 → NAT gateway in the private subnet's route table
+            correct: true
+            explanation: NAT allows outbound-initiated connections only.
+          - text: An internet gateway route in the private subnet
+            misconception: igw-for-private
+            explanation: That would make the subnet public.
+          - text: A VPC endpoint for the internet
+            misconception: endpoint-for-internet
+            explanation: VPC endpoints reach specific AWS services (S3, DynamoDB, …) privately, not the public internet.
+        explanation: For high availability use one NAT gateway per AZ.
+        hint: Outbound only.
+
+      - id: aws.vpc.multi-sg-vs-nacl
+        type: multi
+        prompt: Which statements about security groups and network ACLs are true?
+        options:
+          - text: Security groups are stateful — return traffic is allowed automatically
+            correct: true
+            explanation: They track connections.
+          - text: Security groups support only allow rules
+            correct: true
+            explanation: Anything not allowed is denied.
+          - text: Network ACLs are stateless — return traffic (ephemeral ports) needs its own rule
+            correct: true
+            explanation: Each direction is evaluated independently.
+          - text: Network ACLs apply to individual instances
+            misconception: nacl-per-instance
+            explanation: NACLs apply at the subnet level; security groups attach to network interfaces.
+          - text: Security groups can explicitly deny a single IP
+            misconception: sg-deny-rules
+            explanation: Blocking a specific IP needs a NACL deny rule (or AWS WAF).
+        explanation: SGs are the main instance firewall; NACLs are a coarse subnet-level layer.
+        hint: Which one remembers connections?
+
+      - id: aws.vpc.cloze-reserved-ips
+        type: cloze
+        prompt: "AWS reserves ___ IP addresses in every subnet, so a /24 subnet offers 251 usable addresses."
+        answers: ["5", "five"]
+        explanation: The network address, the VPC router (+1), DNS (+2), one reserved for future use (+3) and the broadcast address.
+        hint: 256 - 251.
+
+  - id: aws.ec2-scaling
+    title: EC2, load balancing and Auto Scaling
+    summary: >
+      EC2 instances come in purchase options (On-Demand, Savings Plans/Reserved,
+      Spot). Elastic Load Balancers spread traffic across AZs; Auto Scaling
+      groups adjust capacity with scaling policies.
+    level: intermediate
+    prereqs: [aws.vpc, docker.images-containers]
+    lesson:
+      intro: "Three questions shape EC2 compute: how you pay for instances, how traffic reaches them, and how their number follows the load."
+      example:
+        lang: shell
+        code: |
+          $ aws ec2 start-instances --instance-ids i-0aa11
+          $ aws ec2 terminate-instances --instance-ids i-0bb22
+          $ aws autoscaling put-scaling-policy \
+              --auto-scaling-group-name web-asg \
+              --policy-name keep-cpu-steady \
+              --policy-type TargetTrackingScaling \
+              --target-tracking-configuration file://t.json
+      steps:
+        - text: "EC2 CLI verbs are plural and take --instance-ids. Stopping keeps the EBS root volume (you still pay for storage) and can be started again; terminating deletes the instance."
+        - text: "Purchase options: On-Demand for spiky or unknown load; Savings Plans or Reserved Instances (1 or 3 years) for steady 24/7 baseline; Spot, up to ~90% cheaper, can be reclaimed with a 2-minute notice; Dedicated Hosts, the priciest, for licensing or compliance."
+          predict:
+            prompt: A web app's database server runs 24/7 at constant load for the next 3 years. Cheapest option?
+            options:
+              - text: Spot Instances
+                explanation: An interruption would take the database down; Spot fits work that can be stopped and restarted.
+              - text: A Savings Plan or Reserved Instance
+                correct: true
+              - text: On-Demand
+                explanation: On-Demand fits unpredictable load; a steady 3-year commitment earns a large discount.
+        - text: "Load balancers spread traffic over healthy targets in several AZs. ALB works at layer 7 (HTTP): it sees paths, hosts and headers and can route /api/* and /static/* to different target groups. NLB works at layer 4 (TCP/UDP) for extreme throughput and static IPs. GWLB inserts virtual appliances such as firewalls."
+        - text: "An Auto Scaling group keeps between min and max instances and replaces unhealthy ones. Target tracking works like a thermostat: it adds or removes instances to hold a metric near a target. Step scaling reacts to alarm thresholds, scheduled scaling changes capacity at set times, and predictive scaling learns daily patterns."
+          predict:
+            prompt: Traffic doubles every weekday at 9:00 sharp, and you want capacity ready before it arrives. Which policy fits?
+            options:
+              - text: Scheduled (or predictive) scaling
+                correct: true
+              - text: Target tracking alone
+                explanation: Target tracking reacts after the metric rises, so the first minutes run short of capacity.
+      takeaway: "Spot for interruptible, Savings Plans for steady, On-Demand for spiky; ALB for HTTP routing; target tracking holds a metric."
+    items:
+      - id: aws.ec2-scaling.mcq-purchase-option
+        type: mcq
+        prompt: A fault-tolerant batch job can be interrupted and restarted at any time. Which purchase option minimizes cost?
+        options:
+          - text: Spot Instances
+            correct: true
+            explanation: Up to ~90% cheaper; AWS can reclaim them with a 2-minute notice, which interruptible work tolerates.
+          - text: Reserved Instances for 3 years
+            misconception: reserved-for-everything
+            explanation: Reservations suit steady 24/7 baseline load, not intermittent batch work.
+          - text: Dedicated Hosts
+            misconception: dedicated-is-cheaper
+            explanation: Dedicated Hosts are the most expensive option, for licensing or compliance needs.
+        explanation: Steady baseline → Savings Plans/Reserved; spiky → On-Demand; interruptible → Spot.
+        hint: Which option is cheap because it can be taken away?
+
+      - id: aws.ec2-scaling.mcq-alb-vs-nlb
+        type: mcq
+        prompt: You need to route /api/* to one target group and /images/* to another. Which load balancer?
+        options:
+          - text: Application Load Balancer
+            correct: true
+            explanation: ALB works at layer 7 and supports path- and host-based routing rules.
+          - text: Network Load Balancer
+            misconception: nlb-understands-http
+            explanation: NLB works at layer 4 (TCP/UDP) and cannot see URL paths; choose it for extreme throughput or static IPs.
+          - text: Gateway Load Balancer
+            misconception: gwlb-for-web
+            explanation: GWLB is for inserting third-party virtual appliances such as firewalls.
+        explanation: HTTP features (paths, headers, redirects) → ALB.
+        hint: Paths are an HTTP (layer 7) concept.
+
+      - id: aws.ec2-scaling.mcq-target-tracking
+        type: mcq
+        prompt: You want the Auto Scaling group to keep average CPU around 50%. Which scaling policy fits?
+        options:
+          - text: Target tracking scaling on ASGAverageCPUUtilization = 50
+            correct: true
+            explanation: The ASG adds and removes instances to keep the metric near the target, like a thermostat.
+          - text: Scheduled scaling
+            misconception: scheduled-for-metrics
+            explanation: Scheduled scaling changes capacity at fixed times, not in response to load.
+          - text: Manually changing desired capacity
+            misconception: manual-is-autoscaling
+            explanation: That is not automatic and will not react at 3 a.m.
+        explanation: Target tracking is the default choice; step scaling gives finer control; predictive scaling learns daily patterns.
+        hint: Thermostat.
+
+      - id: aws.ec2-scaling.cmd-stop-instance
+        type: command
+        prompt: Stop the EC2 instance i-0abc1234 with the AWS CLI.
+        answers:
+          - aws ec2 stop-instances --instance-ids i-0abc1234
+        explanation: stop keeps the EBS root volume (you pay for storage); terminate-instances deletes the instance.
+        hint: The subcommand is plural and takes --instance-ids.
+
+  - id: aws.s3
+    title: S3 storage
+    summary: >
+      S3 stores objects in buckets under keys in a flat namespace. It is
+      strongly consistent, offers storage classes for different access
+      patterns, and Block Public Access is on by default.
+    level: beginner
+    prereqs: [aws.iam]
+    lesson:
+      intro: S3 stores objects (bytes plus metadata) in buckets, each object under a key. It is not a filesystem; it is a huge, durable key-value store.
+      example:
+        lang: shell
+        code: |
+          $ aws s3 mb s3://acme-logs-2026
+          $ aws s3 cp app.log s3://acme-logs-2026/2026/11/
+          $ aws s3 ls s3://acme-logs-2026/2026/
+                                     PRE 11/
+          $ aws s3 sync ./public s3://acme-www
+      steps:
+        - text: "Bucket names are globally unique across all accounts, because they are part of DNS names. The key 2026/11/app.log is one flat string; the \"folders\" that ls and the console show (PRE 11/) are just key prefixes."
+        - text: aws s3 cp works like Unix cp. A destination ending in / keeps the file name. sync copies only new or changed files; add --delete to also remove destination files that no longer exist in the source.
+          predict:
+            prompt: You delete a page locally and run the sync line again. Is it still in s3://acme-www?
+            options:
+              - text: No, sync mirrors deletions
+                explanation: Without --delete, sync only uploads; it never removes destination files.
+              - text: Yes, until you add --delete
+                correct: true
+        - text: "S3 has strong read-after-write consistency (since December 2020): a read right after a successful write returns the new object. A single PUT is limited to 5 GB; above that, use multipart upload (recommended from about 100 MB)."
+        - text: "Storage classes trade price for access: Standard for hot data; Intelligent-Tiering when the pattern is unknown; Standard-IA and One Zone-IA for rare access with millisecond reads; Glacier Instant, Flexible Retrieval and Deep Archive for archives, cheaper and slower in that order. Lifecycle rules move objects between classes automatically."
+          predict:
+            prompt: Backups are read about once a quarter, but a restore must start within milliseconds. Which class fits best?
+            options:
+              - text: S3 Glacier Deep Archive
+                explanation: Retrievals take hours, which breaks the millisecond requirement.
+              - text: S3 Standard
+                explanation: It works but costs more than needed for data read four times a year.
+              - text: S3 Standard-IA or Glacier Instant Retrieval
+                correct: true
+        - text: New buckets have Block Public Access on and ACLs disabled by default (since 2023). Versioning keeps old versions to protect against overwrites and deletes; it does not lower cost.
+      takeaway: "Flat keys in globally named buckets, strongly consistent; pick the class from access frequency and retrieval time."
+    items:
+      - id: aws.s3.mcq-storage-class
+        type: mcq
+        prompt: Compliance logs must be kept 7 years, are almost never read, and a 12-hour retrieval time is acceptable. Cheapest storage class?
+        options:
+          - text: S3 Glacier Deep Archive
+            correct: true
+            explanation: The lowest storage price; standard retrieval within 12 hours.
+          - text: S3 Standard-IA
+            misconception: ia-is-archive
+            explanation: Standard-IA is for infrequent access with millisecond retrieval — more expensive than archive tiers.
+          - text: S3 Standard with versioning
+            misconception: versioning-is-archiving
+            explanation: Versioning protects against deletion; it does not lower cost.
+        explanation: Use lifecycle rules to transition objects to cheaper classes automatically.
+        hint: The access pattern is "almost never" and retrieval can be slow.
+
+      - id: aws.s3.cmd-copy
+        type: command
+        prompt: Upload report.csv to the reports/ prefix of the bucket my-bucket.
+        answers:
+          - aws s3 cp report.csv s3://my-bucket/reports/
+          - aws s3 cp report.csv s3://my-bucket/reports/report.csv
+          - aws s3 cp ./report.csv s3://my-bucket/reports/
+          - aws s3 cp ./report.csv s3://my-bucket/reports/report.csv
+        explanation: "`aws s3 cp <src> <dst>`; a destination ending in / keeps the file name."
+        hint: Same verb as the Unix copy command.
+
+      - id: aws.s3.cmd-sync-site
+        type: command
+        prompt: Mirror the local ./site directory to s3://my-site, deleting remote files that no longer exist locally.
+        answers:
+          - aws s3 sync ./site s3://my-site --delete
+          - aws s3 sync site s3://my-site --delete
+          - aws s3 sync --delete ./site s3://my-site
+          - aws s3 sync ./site/ s3://my-site --delete
+        explanation: sync copies only new or changed files; --delete removes extras at the destination.
+        hint: The flag that removes extra files is --delete.
+
+      - id: aws.s3.multi-facts
+        type: multi
+        prompt: Which statements about S3 are true?
+        options:
+          - text: Reads after a successful write return the new object (strong read-after-write consistency)
+            correct: true
+            explanation: S3 has been strongly consistent since December 2020.
+          - text: Bucket names are globally unique across all AWS accounts
+            correct: true
+            explanation: They are part of DNS names.
+          - text: New buckets block public access by default
+            correct: true
+            explanation: Block Public Access and disabled ACLs are the default since 2023.
+          - text: S3 is a hierarchical filesystem with real directories
+            misconception: s3-is-filesystem
+            explanation: It is a flat key-value store; "folders" are key prefixes shown by the console.
+          - text: An object can be at most 5 GB
+            misconception: s3-5gb-limit
+            explanation: Objects can be up to 5 TB; 5 GB is the limit of a single PUT — use multipart upload above that.
+        explanation: These facts appear often in SAA-C03 storage questions.
+        hint: Two limits are often confused — single PUT vs object size.
+
+  - id: aws.databases
+    title: RDS, Aurora and DynamoDB
+    summary: >
+      RDS/Aurora run managed relational engines — Multi-AZ for availability,
+      read replicas for read scaling. DynamoDB is a serverless key-value store
+      whose performance depends on partition-key design.
+    level: intermediate
+    prereqs: [aws.vpc, sql.transactions]
+    lesson:
+      intro: "AWS offers managed relational databases (RDS, Aurora) and a serverless key-value store (DynamoDB). Choose from the access patterns, then add availability, read scaling or a cache."
+      example:
+        lang: json
+        code: |
+          {
+            "TableName": "Orders",
+            "BillingMode": "PAY_PER_REQUEST",
+            "KeySchema": [
+              {"AttributeName": "customer_id",
+               "KeyType": "HASH"},
+              {"AttributeName": "created_at",
+               "KeyType": "RANGE"}
+            ]
+          }
+      steps:
+        - text: "RDS Multi-AZ keeps a synchronous standby in another AZ and fails over to it automatically. The classic single standby serves no traffic: it is for availability, not speed."
+        - text: Read replicas copy data asynchronously and serve read-only queries, so reporting can move off the primary. They can live in another region for disaster recovery and can be promoted. Aurora keeps 6 copies of the storage across 3 AZs and supports up to 15 replicas behind a reader endpoint.
+          predict:
+            prompt: The primary is fine but you want it to survive an AZ outage automatically. What do you enable?
+            options:
+              - text: Multi-AZ
+                correct: true
+              - text: A read replica in the same AZ
+                explanation: It shares the AZ, and replicas do not fail over automatically without promotion.
+              - text: Automated backups
+                explanation: Restoring from a backup takes a long time; it is recovery, not failover.
+        - text: "In DynamoDB the partition key (HASH) is hashed to choose a partition, and the sort key (RANGE) orders items inside it. A query needs the partition key, so Orders answers \"one customer's orders by date\" well."
+        - text: Traffic spreads only as widely as the partition key's values. A key with few distinct values, such as a status flag, sends most requests to a few hot partitions, which get throttled while total capacity sits idle.
+          predict:
+            prompt: Which partition key spreads load best for an orders table?
+            options:
+              - text: country, about 30 values
+                explanation: Few distinct values, and a big country makes one partition hot.
+              - text: order_id, unique per order
+                correct: true
+              - text: is_paid, true or false
+                explanation: Two values means at most two busy partitions.
+        - text: "DynamoDB fits known access patterns and millisecond key lookups at huge scale. It has no joins or ad-hoc SQL (use RDS/Aurora) and is not for analytics (use Redshift or Athena). For repeated identical reads, ElastiCache (Redis/Valkey or Memcached) caches in memory; DAX is the DynamoDB-only cache."
+      takeaway: Multi-AZ for availability, read replicas for reads, high-cardinality partition keys for DynamoDB, a cache for hot reads.
+    items:
+      - id: aws.databases.mcq-multi-az-vs-replica
+        type: mcq
+        prompt: A read-heavy RDS PostgreSQL database is overloaded by reporting queries. What helps with read scaling?
+        options:
+          - text: Add read replicas and send reporting queries to them
+            correct: true
+            explanation: Replicas serve reads asynchronously and offload the primary.
+          - text: Enable Multi-AZ (single standby)
+            misconception: multi-az-scales-reads
+            explanation: A classic Multi-AZ standby only exists for failover and serves no traffic.
+          - text: Turn on automated backups
+            misconception: backups-scale
+            explanation: Backups are for recovery, not performance.
+        explanation: Multi-AZ = high availability; read replicas = read scaling (and cross-region DR).
+        hint: Which feature serves traffic?
+
+      - id: aws.databases.mcq-hot-partition
+        type: mcq
+        prompt: A DynamoDB table uses status (pending/done) as its partition key and requests are throttled although total capacity is ample. Why?
+        options:
+          - text: A low-cardinality partition key concentrates traffic on a few hot partitions
+            correct: true
+            explanation: Choose a high-cardinality key (e.g. order_id) so traffic spreads across partitions.
+          - text: DynamoDB cannot store more than two distinct key values
+            misconception: dynamo-key-limit
+            explanation: There is no such limit; the problem is distribution.
+          - text: The table needs a SQL index
+            misconception: dynamo-is-sql
+            explanation: DynamoDB is not relational; use GSIs designed around access patterns.
+        explanation: DynamoDB performance is about access patterns and key design first.
+        hint: How many distinct values does status have?
+
+      - id: aws.databases.multi-dynamo-fit
+        type: multi
+        prompt: When is DynamoDB a good fit?
+        options:
+          - text: Single-digit-millisecond key lookups at very large scale
+            correct: true
+            explanation: That is its core strength.
+          - text: Access patterns are known up front
+            correct: true
+            explanation: Keys and indexes are designed around queries.
+          - text: Ad-hoc queries joining many tables
+            misconception: dynamo-is-sql
+            explanation: DynamoDB has no joins; use RDS/Aurora for relational queries.
+          - text: Complex analytical aggregations over all data
+            misconception: oltp-for-analytics
+            explanation: Use Redshift or Athena for analytics.
+        explanation: Pick the store from the access patterns.
+        hint: Think "key-value at scale".
+
+      - id: aws.databases.cloze-elasticache
+        type: cloze
+        prompt: "To offload repeated identical reads from RDS with sub-millisecond latency, add Amazon ___ (Redis/Valkey or Memcached) as a cache."
+        answers: ["elasticache"]
+        explanation: ElastiCache is the managed in-memory cache; DAX is the equivalent only for DynamoDB.
+        hint: Elastic + cache.
+
+  - id: aws.well-architected
+    title: Well-Architected, decoupling and resilience
+    summary: >
+      The Well-Architected Framework has six pillars. Resilient designs span
+      multiple AZs, decouple components with queues, and choose a disaster
+      recovery strategy from RTO/RPO and cost.
+    level: advanced
+    prereqs: [aws.ec2-scaling, aws.s3, aws.databases, architecture.idempotency-queues]
+    lesson:
+      intro: "The Well-Architected Framework reviews a workload against six pillars. Its reliability ideas are concrete: spread across AZs, decouple with queues, plan recovery."
+      example:
+        lang: shell
+        code: |
+          $ aws sqs receive-message --queue-url "$Q" \
+              --wait-time-seconds 20 \
+              --max-number-of-messages 10
+          # … process each message (idempotently) …
+          $ aws sqs delete-message --queue-url "$Q" \
+              --receipt-handle "$HANDLE"
+      steps:
+        - text: "The six pillars: operational excellence, security, reliability, performance efficiency, cost optimization and sustainability (added in 2021). Scalability is part of reliability and performance, not a pillar of its own."
+        - text: "A queue between the web tier and the workers absorbs bursts: producers only send-message (with --queue-url and --message-body) and return. Workers poll at their own pace, and an Auto Scaling group can scale them on queue depth."
+        - text: Receiving does not remove a message; it hides it for the visibility timeout (30 s by default). If the worker crashes before delete-message, the message reappears and is processed again. Standard queues deliver at least once, so workers must be idempotent.
+          predict:
+            prompt: A worker processes a message but crashes before delete-message. What happens?
+            options:
+              - text: The message is lost
+                explanation: Only delete-message removes it; it comes back when the visibility timeout ends.
+              - text: SQS deletes it after the first receive
+                explanation: Receiving only hides the message temporarily.
+              - text: It becomes visible again and is redelivered
+                correct: true
+        - text: "Recovery goals: RTO is how long recovery may take; RPO is how much recent data may be lost, measured in time."
+        - text: "DR strategies, cheapest and slowest first: backup and restore (hours), pilot light (data replicated, servers off), warm standby (a scaled-down copy running), multi-site active/active (near-zero RTO, double cost)."
+          predict:
+            prompt: "RTO and RPO of hours are fine and cost must be minimal. Which strategy?"
+            options:
+              - text: Backup and restore
+                correct: true
+              - text: Multi-site active/active
+                explanation: Full capacity in two regions is the most expensive choice, for near-zero RTO.
+      takeaway: "Six pillars; queues absorb bursts and need idempotent consumers; pick DR from RTO, RPO and cost."
+    items:
+      - id: aws.well-architected.multi-pillars
+        type: multi
+        prompt: Which are pillars of the AWS Well-Architected Framework?
+        options:
+          - text: Operational excellence
+            correct: true
+            explanation: Run and monitor systems and improve processes.
+          - text: Security
+            correct: true
+            explanation: Protect data, systems and assets.
+          - text: Reliability
+            correct: true
+            explanation: Recover from failures and meet demand.
+          - text: Performance efficiency
+            correct: true
+            explanation: Use resources efficiently as demand changes.
+          - text: Cost optimization
+            correct: true
+            explanation: Avoid unnecessary cost.
+          - text: Sustainability
+            correct: true
+            explanation: Added as the sixth pillar in 2021.
+          - text: Scalability
+            misconception: scalability-is-pillar
+            explanation: Scalability is part of reliability and performance efficiency, not its own pillar.
+        explanation: Six pillars — operational excellence, security, reliability, performance efficiency, cost optimization, sustainability.
+        hint: There are six, and one is about the environment.
+
+      - id: aws.well-architected.mcq-decouple
+        type: mcq
+        prompt: Order uploads arrive in bursts and the processing tier falls over. Which design handles bursts best?
+        options:
+          - text: Put an SQS queue between the web tier and an Auto Scaling group of workers scaled on queue depth
+            correct: true
+            explanation: The queue absorbs spikes and workers drain it at their own pace.
+          - text: Use a bigger instance for the processing tier
+            misconception: scale-up-fixes-bursts
+            explanation: Vertical scaling has a ceiling and still fails when the burst exceeds it.
+          - text: Have the web tier call the workers synchronously with retries
+            misconception: retries-fix-overload
+            explanation: Retries add even more load to an overloaded tier.
+        explanation: Queues decouple producers from consumers; workers must be idempotent because SQS standard queues deliver at least once.
+        hint: Something needs to buffer the spike.
+
+      - id: aws.well-architected.mcq-dr-strategy
+        type: mcq
+        prompt: "A business needs RTO of minutes at moderate cost: a scaled-down but fully functional copy of production runs in another region. Which DR strategy is this?"
+        options:
+          - text: Warm standby
+            correct: true
+            explanation: A smaller always-running copy is scaled up on failover.
+          - text: Backup and restore
+            misconception: backup-is-fast-dr
+            explanation: Cheapest, but RTO is hours because everything is rebuilt from backups.
+          - text: Pilot light
+            misconception: pilot-light-is-running
+            explanation: Pilot light keeps only core data replicated (e.g. databases); application servers are off until failover.
+          - text: Multi-site active-active
+            misconception: active-active-is-cheap
+            explanation: Full capacity in both regions gives near-zero RTO at the highest cost.
+        explanation: From cheapest/slowest to most expensive/fastest — backup & restore, pilot light, warm standby, multi-site.
+        hint: Is it running, and at what size?
+
+      - id: aws.well-architected.cmd-sqs-send
+        type: command
+        prompt: "Send the message body hello to the SQS queue at https://sqs.us-east-1.amazonaws.com/123456789012/orders."
+        answers:
+          - aws sqs send-message --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/orders --message-body hello
+          - aws sqs send-message --message-body hello --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/orders
+        explanation: send-message needs the queue URL (not just the name) and the body; consumers use receive-message and delete-message.
+        hint: Two required options, --queue-url and --message-body.

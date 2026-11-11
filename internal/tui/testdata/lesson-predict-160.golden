@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                                                      │ ▾ LESSON                    not graded
+ Logic            ────────   0% │                                                                                      │ ✓ intro & example
+  ▸ ○ Loops                     │ ┌─ Logic › Loops ────────────────────────────────────────────── lesson · step 2/3 ─┐ │ ✓ step 1
+                                │ │                                                                                  │ │ ▸ step 2 · predict
+                                │ │ A for loop repeats its body while its condition holds.                           │ │ · step 3
+                                │ │                                                                                  │ │ · takeaway
+                                │ │  1  for i := 0; i < 3; i++ {                                                 go  │ │
+                                │ │  2      fmt.Println(i)                                                           │ │ ▾ CONCEPT                     beginner
+                                │ │  3  }                                                                            │ │ Repeat a block while a condition
+                                │ │                                                                                  │ │ holds.
+                                │ │ ✓ 1  i := 0 runs once, before the first check of i < 3.                          │ │
+                                │ │                                                                                  │ │ ▾ PREREQUISITES
+                                │ │ ▸ 2  Predict: After the loop prints 2, what happens next?                        │ │ None: a starting point.
+                                │ │                                                                                  │ │
+                                │ │         1   i becomes 3 and the loop stops                                       │ │ Predictions are only for you: nothing
+                                │ │       ▸ 2   It prints 3 and then stops                                           │ │ here is graded or scheduled. The
+                                │ │                                                                                  │ │ questions start after the takeaway.
+                                │ │ 1–9 or j/k enter predicts   s  skip lesson                                       │ │
+                                │ │                                                                                  │ │
+                                │ └──────────────────────────────────────────────────────────────────────────────────┘ │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+ ────────────────────────────── │                                                                                      │
+ ● █ mastered  ◑ ▓ review       │                                                                                      │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                                                      │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                                                  lesson [✓●·] step 2/3 │ session [●] 1/1 ✓0 ✗0 │ streak 0d
+ lesson · logic.loops · not graded                                                               1-9 predict · j/k move · enter choose · s skip lesson · ? help

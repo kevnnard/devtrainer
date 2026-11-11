@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                        │ ▾ SESSION                1/1
+ Logic            ────────   0% │                                                        │ ▸ Loops                Logic
+  ▸ ○ Loops                     │ ┌─ Logic › Loops ──────────────────────────── ○ new ─┐ │
+                                │ │                                                    │ │ ▾ CONCEPT           beginner
+                                │ │ This should print every element. Which line is     │ │ Repeat a block while a
+                                │ │ wrong?                                             │ │ condition holds.
+                                │ │                                                    │ │
+                                │ │ Select the faulty line.                            │ │ ▾ IF YOU ANSWER     next due
+                                │ │   1 │ xs := []int{1, 2, 3}                         │ │ ✗ Again wrong     Wed 11 Nov
+                                │ │ ▸ 2 │ for i := 0; i <= len(xs); i++ {              │ │ ◆ Hard  hint/slow Thu 12 Nov
+                                │ │   3 │     fmt.Println(xs[i])                       │ │ ✓ Good  correct   Fri 13 Nov
+                                │ │   4 │ }                                            │ │ ▲ Easy  fast      Thu 26 Nov
+                                │ │                                                    │ │
+                                │ └────────────────────────────────────────────────────┘ │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+ ────────────────────────────── │                                                        │
+ ● █ mastered  ◑ ▓ review       │                                                        │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                        │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                     session [●] 1/1 ✓0 ✗0 │ streak 0d │ Tue 10 Nov
+ logic.loops.bug-bounds · bug                                          j/k select line · enter submit · h hint · ? help

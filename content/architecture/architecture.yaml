@@ -1,0 +1,586 @@
+track:
+  id: architecture
+  title: Software architecture
+  description: Design principles and distributed-systems trade-offs — SOLID, coupling and cohesion, layered and hexagonal architecture, caching, CAP, idempotency and queues.
+  order: 90
+
+concepts:
+  - id: architecture.coupling-cohesion
+    title: Coupling and cohesion
+    summary: >
+      Cohesion is how strongly the parts of a module belong together; coupling
+      is how much modules depend on each other. Aim for high cohesion and low
+      coupling so changes stay local.
+    level: beginner
+    prereqs: [go.interfaces-generics]
+    lesson:
+      intro: "Cohesion: do the parts of a module belong together? Coupling: how much do modules depend on each other's details?"
+      example:
+        lang: go
+        code: |
+          // package billing
+          type Mailer interface {
+              Send(to, body string) error
+          }
+
+          func Charge(c Customer, m Mailer) error {
+              // charge the card, then:
+              return m.Send(c.Email, "Payment received")
+          }
+      steps:
+        - text: billing holds only charging logic. Everything in it changes for the same reason, so it is cohesive.
+        - text: Charge knows only the Send method. An SMTP mailer, a queue or a test fake can stand behind it.
+          predict:
+            prompt: Charge sends an email. What does billing depend on?
+            options:
+              - text: Only the small Mailer interface
+                correct: true
+              - text: The SMTP library and its settings
+                explanation: Charge never names SMTP; any type with a Send method works.
+              - text: The whole email package
+                explanation: billing declares the one method it needs and imports no email code.
+        - text: "Nothing in billing changes: callers pass a different Mailer. The dependency is a small, stable interface, so coupling is low."
+          predict:
+            prompt: The team switches email providers. What must change in billing?
+            options:
+              - text: Charge and every one of its callers
+                explanation: Only the code that builds the Mailer changes; billing is untouched.
+              - text: Nothing
+                correct: true
+        - text: "The opposite is a utils package with dates, retries and hashing: low cohesion, because unrelated code shares a module and everything imports it."
+      takeaway: "High cohesion inside a module, low coupling between modules: changes stay local."
+    items:
+      - id: architecture.coupling-cohesion.mcq-goal
+        type: mcq
+        prompt: Which combination makes a codebase easiest to change?
+        options:
+          - text: High cohesion inside modules, low coupling between them
+            correct: true
+            explanation: Related code changes together in one place, and a change rarely ripples into other modules.
+          - text: Low cohesion, low coupling
+            misconception: cohesion-irrelevant
+            explanation: Unrelated code in one module means every change touches modules full of things you did not mean to change.
+          - text: High coupling, so modules can reuse each other's internals
+            misconception: coupling-is-reuse
+            explanation: Reuse through internals makes every internal change a breaking change.
+        explanation: A module should have one reason to change and a small, stable interface.
+        hint: What do you want a change to touch — one module or many?
+
+      - id: architecture.coupling-cohesion.multi-tight-coupling
+        type: multi
+        prompt: Which are symptoms of tight coupling?
+        options:
+          - text: Changing one module's internals forces edits in many others
+            correct: true
+            explanation: The modules know too much about each other.
+          - text: Modules communicate through shared mutable global state
+            correct: true
+            explanation: Any module can break any other through the shared state.
+          - text: Two packages import each other (a cycle)
+            correct: true
+            explanation: Neither can be understood, tested or deployed alone (Go even forbids import cycles).
+          - text: Modules interact through a small, stable interface
+            misconception: interface-is-coupling
+            explanation: That is the definition of loose coupling.
+        explanation: Coupling is measured by how much a change propagates.
+        hint: Which ones make a change ripple?
+
+      - id: architecture.coupling-cohesion.mcq-utils-package
+        type: mcq
+        prompt: "A package named utils holds date formatting, retry logic, password hashing and CSV parsing. What is the main problem?"
+        options:
+          - text: Low (coincidental) cohesion — unrelated responsibilities share a module, so it grows forever and everything depends on it
+            correct: true
+            explanation: Split by purpose (timefmt, retry, password, csvx) so each package has one reason to change.
+          - text: It is too small
+            misconception: size-is-cohesion
+            explanation: Cohesion is about relatedness, not size.
+          - text: Nothing; shared helpers belong together
+            misconception: cohesion-irrelevant
+            explanation: Being "helpers" is not a shared purpose.
+        explanation: A good package name describes what it provides; utils describes nothing.
+        hint: What do the four functions have in common?
+
+  - id: architecture.solid
+    title: SOLID principles
+    summary: >
+      Single responsibility, Open/closed, Liskov substitution, Interface
+      segregation, Dependency inversion — guidelines for code that is easy to
+      extend and test.
+    level: intermediate
+    prereqs: [architecture.coupling-cohesion]
+    lesson:
+      intro: SOLID is five guidelines for code that is easy to extend and test. Most of them are about where to draw boundaries and which way dependencies point.
+      example:
+        lang: python
+        code: |
+          class Cache:
+              def __init__(self): self.d = {}
+              def put(self, k, v): self.d[k] = v
+              def get(self, k): return self.d.get(k)
+
+          class OneSlotCache(Cache):
+              def put(self, k, v):
+                  if not self.d:
+                      super().put(k, v)
+
+          def warm(c):
+              c.put("a", 1); c.put("b", 2)
+              return c.get("b")
+
+          print(warm(Cache()), warm(OneSlotCache()))
+      steps:
+        - text: "S, single responsibility: a module has one reason to change. O, open/closed: add behavior by adding a new type, not by editing a growing if/else."
+        - text: "L, Liskov substitution: code written for the base type must keep working with any subtype. OneSlotCache keeps the put signature but silently ignores the second write, so warm, written against Cache, breaks."
+          predict:
+            prompt: What does the last line print?
+            options:
+              - text: 2 None
+                correct: true
+              - text: 2 2
+                explanation: OneSlotCache stores only the first key, so get("b") finds nothing.
+              - text: TypeError
+                explanation: The override has the same signature; it breaks the contract, not the types.
+        - text: The fix is not a smarter override. A cache that refuses writes is a different abstraction, so give it its own type instead of inheriting a promise it cannot keep.
+        - text: "I, interface segregation: clients should not depend on methods they never call. Prefer small role interfaces, like Go's io.Reader and io.Writer, over one interface with ten methods that implementers stub out."
+        - text: "D, dependency inversion: high-level policy should not depend on low-level details. The high-level module declares the interface it needs; the database or SMTP implementation satisfies it and is passed in (injected) from outside, so tests can pass a fake."
+          predict:
+            prompt: ReportService needs storage. Under dependency inversion, which package declares the Storage interface?
+            options:
+              - text: The S3 client package
+                explanation: Then the high-level module would still import and depend on the detail.
+              - text: The package that has ReportService
+                correct: true
+      takeaway: "Subtypes must keep their base type's promises; keep interfaces small; the high-level module owns the abstraction."
+    items:
+      - id: architecture.solid.mcq-dip
+        type: mcq
+        prompt: "OrderService creates a PostgresOrderRepo inside its constructor. What does applying Dependency Inversion change?"
+        options:
+          - text: OrderService depends on an OrderRepository interface it owns, and the Postgres implementation is injected from outside
+            correct: true
+            explanation: High-level policy no longer depends on a low-level detail; tests can inject a fake.
+          - text: PostgresOrderRepo now creates OrderService
+            misconception: dip-reverses-construction
+            explanation: Inversion is about the direction of source-code dependencies, not about who constructs whom.
+          - text: OrderService extends PostgresOrderRepo
+            misconception: inheritance-is-abstraction
+            explanation: Inheritance increases coupling to the concrete class.
+        explanation: "\"Depend on abstractions, not concretions\" — and the abstraction belongs to the high-level module."
+        hint: Who should own the interface?
+
+      - id: architecture.solid.bug-lsp
+        type: bug
+        prompt: Code that calls r.set_width(5) and then expects r.area() == 5 * h breaks when r is a Square. Which line violates Liskov substitution?
+        code: |
+          class Rectangle:
+              def __init__(self, w, h):
+                  self.w, self.h = w, h
+              def set_width(self, w):
+                  self.w = w
+              def area(self):
+                  return self.w * self.h
+          class Square(Rectangle):
+              def set_width(self, w):
+                  self.w = self.h = w
+        bug_line: 10
+        explanation: The override silently changes the height, breaking a guarantee callers rely on. A subtype must honor its base type's contract; make Square and Rectangle separate (immutable) shapes instead.
+        hint: Which line does more than the base method promised?
+
+      - id: architecture.solid.mcq-isp
+        type: mcq
+        prompt: A Printer interface has Print, Scan, Fax and Staple. A simple printer implements Scan, Fax and Staple by panicking. Which principle is violated, and what is the fix?
+        options:
+          - text: Interface segregation — split it into small role interfaces (Printer, Scanner, Faxer) that clients depend on individually
+            correct: true
+            explanation: Clients should not depend on methods they do not use; Go's io.Reader/io.Writer are the model.
+          - text: Single responsibility — merge everything into one class
+            misconception: srp-means-one-class
+            explanation: Merging makes the problem worse.
+          - text: Open/closed — add a mode flag to each method
+            misconception: flags-extend-behavior
+            explanation: Flags add branching to every implementation instead of separating roles.
+        explanation: Small interfaces are easier to implement, fake and compose.
+        hint: Which principle is about interface size?
+
+  - id: architecture.layered-hexagonal
+    title: Layered and hexagonal architecture
+    summary: >
+      Hexagonal (ports and adapters) keeps the domain and use cases at the
+      center with no dependencies on frameworks; adapters for HTTP, databases
+      and queues plug into ports defined by the core.
+    level: intermediate
+    prereqs: [architecture.solid]
+    lesson:
+      intro: "Hexagonal architecture (ports and adapters) puts business rules at the center and keeps HTTP, databases and queues at the edges, plugged in through interfaces."
+      example:
+        lang: go
+        code: |
+          // package orders (the core)
+          type Repository interface { // a port
+              Get(id string) (*Order, error)
+              Save(o *Order) error
+          }
+
+          func (o *Order) Ship() error {
+              if o.Status == "cancelled" {
+                  return ErrCancelled
+              }
+              o.Status = "shipped"
+              return nil
+          }
+          // package postgres imports orders and
+          // implements Repository with SQL.
+      steps:
+        - text: The core holds entities (Order), their rules (a cancelled order cannot ship) and use cases that orchestrate them. It imports no web framework and no database driver.
+        - text: A port is an interface the core defines for what it needs from the outside, here Repository. The core speaks in its own terms (Get, Save), not in SQL.
+        - text: Adapters translate. The postgres adapter implements Repository with SQL; an HTTP adapter decodes requests, calls a use case and maps the result to status codes and JSON.
+          predict:
+            prompt: Which import is allowed?
+            options:
+              - text: package orders imports database/sql
+                explanation: Then the core depends on a storage detail and cannot be tested without a database.
+              - text: package postgres imports orders
+                correct: true
+              - text: Both, as long as there is no cycle
+                explanation: The core must import neither adapter; dependencies point one way.
+        - text: "The dependency rule: source-code imports point inward, from adapters to the core, never outward. A quick test for where code belongs: would it change if you swapped Postgres for DynamoDB, or HTTP for gRPC? Then it belongs in an adapter."
+          predict:
+            prompt: Where does the rule "a cancelled order cannot ship" belong?
+            options:
+              - text: In the core, on Order
+                correct: true
+              - text: In the HTTP handler
+                explanation: Every other entry point (CLI, queue consumer) would then have to repeat the rule.
+              - text: In the SQL UPDATE
+                explanation: The rule does not depend on the database; it would be lost when storage changes.
+      takeaway: "Core = entities, rules and ports; adapters translate at the edges; imports always point inward."
+    items:
+      - id: architecture.layered-hexagonal.mcq-dependency-direction
+        type: mcq
+        prompt: In a hexagonal architecture, which way do source-code dependencies point?
+        options:
+          - text: Inward — adapters (HTTP, SQL) import the core; the core imports neither
+            correct: true
+            explanation: The core defines ports (interfaces); adapters implement or call them.
+          - text: Outward — the domain imports the database package to save itself
+            misconception: domain-depends-on-db
+            explanation: Then the domain cannot be tested or reused without the database.
+          - text: Both ways, as long as there are no cycles at runtime
+            misconception: bidirectional-ok
+            explanation: Two-way dependencies collapse the layers into one tangled unit.
+        explanation: The dependency rule keeps business logic independent of delivery and storage details.
+        hint: What should the domain know about Postgres?
+
+      - id: architecture.layered-hexagonal.multi-core
+        type: multi
+        prompt: Which belong in the core (domain plus application) of a hexagonal service?
+        options:
+          - text: Business rules such as "a shipped order cannot be cancelled"
+            correct: true
+            explanation: Rules are the reason the core exists.
+          - text: Port interfaces such as OrderRepository
+            correct: true
+            explanation: The core defines what it needs from the outside.
+          - text: SQL queries
+            misconception: sql-in-domain
+            explanation: Queries belong to the database adapter that implements the port.
+          - text: HTTP status codes and JSON tags
+            misconception: transport-in-domain
+            explanation: Transport details belong to the HTTP adapter.
+        explanation: If you could swap Postgres for DynamoDB or HTTP for gRPC without touching it, it belongs in the core.
+        hint: Would it change if you switched the database?
+
+      - id: architecture.layered-hexagonal.parsons-request-flow
+        type: parsons
+        prompt: Order what happens when a "cancel order" HTTP request goes through a hexagonal service.
+        lines:
+          - "HTTP adapter decodes the request into a CancelOrder command"
+          - "Use case loads the Order through the OrderRepository port"
+          - "Order.Cancel() checks the business rule and changes its state"
+          - "Use case saves the Order through the OrderRepository port"
+          - "Postgres adapter runs the UPDATE inside a transaction"
+          - "HTTP adapter maps the result to a 200 response"
+        explanation: The inbound adapter translates, the use case orchestrates, the entity decides, the outbound adapter persists, and the inbound adapter translates the result back.
+        hint: The entity decides; the adapters only translate.
+
+  - id: architecture.caching
+    title: Caching
+    summary: >
+      Caches trade freshness for latency. Cache-aside reads the cache, falls
+      back to the database and populates the cache; writes update the database
+      and invalidate the cached entry. TTLs bound staleness.
+    level: intermediate
+    prereqs: [architecture.layered-hexagonal, sql.indexes]
+    lesson:
+      intro: A cache keeps copies of expensive results in fast memory. You trade freshness for speed, so every design has to answer when a copy stops being trusted.
+      example:
+        lang: python
+        code: |
+          import time
+          cache, TTL = {}, 60
+
+          def get_user(uid):
+              hit = cache.get(uid)
+              if hit and hit[1] > time.monotonic():
+                  return hit[0]
+              user = db_load(uid)  # miss
+              cache[uid] = (user, time.monotonic() + TTL)
+              return user
+
+          def rename(uid, name):
+              db_save(uid, name)
+              cache.pop(uid, None)  # invalidate
+      steps:
+        - text: This is cache-aside. The application checks the cache first; on a miss (or an expired entry) it reads the database, the source of truth, stores the value with a TTL and returns it. In read-through caching the cache library would load from the database itself.
+        - text: The TTL bounds staleness. Even if an invalidation is missed, no entry is trusted for more than 60 seconds.
+        - text: rename writes the database first, then deletes the cached entry. The next get_user misses and loads the fresh value.
+          predict:
+            prompt: Why delete the entry instead of writing the new name into the cache?
+            options:
+              - text: Two concurrent writers could leave the older value in the cache
+                correct: true
+              - text: Writing to a cache is slower than deleting
+                explanation: Speed is similar; the issue is ordering between concurrent writes.
+        - text: "A cache stampede: a hot key expires and thousands of requests miss at once and all hit the database. Mitigations: let one request recompute while the others wait or get the stale value (lock or single-flight), add random jitter to TTLs, or refresh hot keys before they expire."
+          predict:
+            prompt: Every key gets TTL = 60 at startup. What happens about a minute later?
+            options:
+              - text: Nothing special
+                explanation: Keys created together expire together, so their misses arrive in one burst.
+              - text: The cache refreshes itself
+                explanation: Cache-aside never reloads on its own; the application loads on a miss.
+              - text: Many keys expire at once and the database gets a burst
+                correct: true
+      takeaway: "Cache-aside: read cache, on miss load and store with a TTL; on write update the DB and delete the key; spread expiry."
+    items:
+      - id: architecture.caching.mcq-cache-aside-read
+        type: mcq
+        prompt: In the cache-aside pattern, what happens on a cache miss?
+        options:
+          - text: The application reads the database, writes the value into the cache (with a TTL) and returns it
+            correct: true
+            explanation: The application owns both the lookup and the population.
+          - text: The cache itself queries the database
+            misconception: cache-aside-is-read-through
+            explanation: That is read-through caching, where the cache library loads data for you.
+          - text: The request fails until a background job fills the cache
+            misconception: miss-is-error
+            explanation: A miss is normal; the database is the source of truth.
+        explanation: Cache-aside is the most common pattern with Redis/Valkey.
+        hint: Who talks to the database?
+
+      - id: architecture.caching.cloze-invalidate
+        type: cloze
+        prompt: "In cache-aside, a write updates the database and then ___ the cached entry, so the next read reloads fresh data."
+        answers: ["deletes", "invalidates", "evicts", "removes", "delete", "invalidate", "evict", "remove"]
+        explanation: Deleting is safer than writing the new value into the cache, which can race with concurrent writers and leave a stale value.
+        hint: Removing beats updating.
+
+      - id: architecture.caching.multi-stampede
+        type: multi
+        prompt: A hot key expires and thousands of requests hit the database at once (a cache stampede). Which mitigations help?
+        options:
+          - text: Let only one request recompute the value (lock or single-flight) while others wait or serve the stale value
+            correct: true
+            explanation: Coalescing turns thousands of identical queries into one.
+          - text: Add random jitter to TTLs so keys do not expire together
+            correct: true
+            explanation: Spreading expirations avoids synchronized misses.
+          - text: Refresh hot keys before they expire
+            correct: true
+            explanation: Early or background refresh keeps the key warm.
+          - text: Remove the TTL entirely on every key
+            misconception: no-ttl-no-problem
+            explanation: Data then stays stale forever and memory grows without bound.
+        explanation: Stampedes are a thundering-herd problem; coalesce, jitter or refresh early.
+        hint: Which options reduce simultaneous recomputation?
+
+  - id: architecture.cap-consistency
+    title: CAP and consistency models
+    summary: >
+      During a network partition a distributed system must choose between
+      consistency (every read sees the latest write) and availability (every
+      request gets a response). Eventual consistency converges later.
+    level: advanced
+    prereqs: [architecture.caching, sql.transactions]
+    lesson:
+      intro: When data lives on several machines, the network between them can fail. CAP describes what a system can still promise while that happens.
+      steps:
+        - text: "C, consistency: every read sees the latest successful write, as if there were one copy (linearizability). A, availability: every request to a working node gets a non-error response. P, partition tolerance: the system keeps running when nodes cannot talk to each other."
+        - text: Real networks do partition, so P is not optional. The actual choice comes during a partition. A CP system refuses some requests rather than risk divergence; an AP system keeps answering, possibly with stale data, and reconciles later.
+          predict:
+            prompt: A partition splits a 5-node cluster that needs a majority to accept writes into 3 and 2 nodes. Which side accepts writes?
+            options:
+              - text: Both sides
+                explanation: Then the two halves could accept conflicting writes; the majority rule prevents that.
+              - text: The 3-node side
+                correct: true
+              - text: Neither side
+                explanation: 3 of 5 is still a majority, so that side keeps working.
+        - text: Consensus systems built on majority quorums (Raft, Paxos) are CP. Systems that answer from any reachable replica or from caches are AP; some stores let you tune this per query with quorum levels.
+        - text: "With no partition, CAP forces no choice. PACELC adds the everyday trade-off: else (E), choose latency (L) or consistency (C). Waiting for replicas to confirm makes writes slower."
+        - text: Eventual consistency means replicas converge once writes stop arriving. With asynchronous replicas, a user can write and then read an old value from a lagging replica. Read-your-writes fixes that by sending the user's own reads to the primary for a while, or by tracking session versions.
+          predict:
+            prompt: Reads go to asynchronous replicas. A user saves a post, refreshes and does not see it. What is most likely?
+            options:
+              - text: Replication lag; the replica has not applied the write yet
+                correct: true
+              - text: The write was rolled back
+                explanation: The primary committed it; an asynchronous replica may simply be a moment behind.
+      takeaway: "Partitions happen, so the choice is C or A during one; majority quorums are CP; async replicas are eventually consistent."
+    items:
+      - id: architecture.cap-consistency.mcq-partition
+        type: mcq
+        prompt: What does the CAP theorem actually say?
+        options:
+          - text: When a network partition happens, a system must give up either consistency or availability
+            correct: true
+            explanation: Partitions are not optional in real networks, so the real choice is C or A during one.
+          - text: You can pick any two of C, A and P at all times, including CA
+            misconception: cap-pick-two-anytime
+            explanation: A networked system cannot opt out of partitions; "CA" only describes behavior when there is no partition.
+          - text: Consistent systems are always slower
+            misconception: cap-is-latency
+            explanation: CAP says nothing about latency; PACELC adds the latency trade-off when there is no partition.
+        explanation: Without a partition you can have both; PACELC describes the latency-vs-consistency trade-off in that case.
+        hint: Which letter is not really a choice?
+
+      - id: architecture.cap-consistency.mcq-read-your-writes
+        type: mcq
+        prompt: A user updates their profile, refreshes, and sees the old name for a second. Reads go to asynchronous replicas. What is happening?
+        options:
+          - text: Eventual consistency (replication lag); route that user's reads to the primary for a while or use read-your-writes sessions
+            correct: true
+            explanation: Async replicas apply writes after a delay.
+          - text: The write was lost
+            misconception: stale-read-is-lost-write
+            explanation: The write is committed on the primary; replicas just have not applied it yet.
+          - text: The cache must be broken, because databases are always consistent
+            misconception: replicas-always-consistent
+            explanation: Asynchronous replicas are by definition allowed to lag.
+        explanation: Choose per use case — strong reads for "my own data", eventually consistent reads for feeds.
+        hint: Where did the read go?
+
+      - id: architecture.cap-consistency.multi-cp-systems
+        type: multi
+        prompt: Which systems choose consistency over availability during a partition (CP)?
+        options:
+          - text: etcd (Raft)
+            correct: true
+            explanation: Without a majority quorum it rejects writes rather than diverge.
+          - text: ZooKeeper
+            correct: true
+            explanation: A minority partition stops serving writes.
+          - text: DNS
+            misconception: everything-is-cp
+            explanation: DNS keeps answering from caches, possibly stale — it is AP.
+          - text: Cassandra with consistency level ONE
+            misconception: everything-is-cp
+            explanation: Any replica can answer, favoring availability; QUORUM reads and writes move it toward consistency.
+        explanation: Consensus systems (Raft, Paxos) are CP; caches and leaderless stores tuned for availability are AP.
+        hint: Which ones need a majority to accept a write?
+
+  - id: architecture.idempotency-queues
+    title: Idempotency and message queues
+    summary: >
+      Networks retry and queues deliver at least once, so the same request or
+      message can arrive twice. Idempotent handlers make duplicates harmless;
+      dead-letter queues capture messages that keep failing.
+    level: advanced
+    prereqs: [architecture.cap-consistency]
+    lesson:
+      intro: Clients retry after timeouts and queues redeliver after failures, so the same request or message will sometimes arrive twice. Handlers must make the second copy harmless.
+      example:
+        lang: python
+        code: |
+          processed = set()  # in production: a DB table
+          points = {"ana": 0}
+
+          def handle(msg):
+              if msg["id"] in processed:
+                  return "skip"  # duplicate: ack, do nothing
+              points[msg["user"]] += 10
+              processed.add(msg["id"])
+              return "done"
+
+          m = {"id": "m-1", "user": "ana"}
+          print(handle(m), handle(m), points)
+      steps:
+        - text: "At-least-once delivery: the queue redelivers any message that was not acknowledged in time. A consumer that does the work and crashes before the ack sees the message again, however fast it is."
+        - text: An operation is idempotent when doing it twice has the same effect as doing it once. handle records each message ID and skips IDs it has already seen.
+          predict:
+            prompt: What does the last line print?
+            options:
+              - text: "done done {'ana': 20}"
+                explanation: The second call finds m-1 in processed and skips the side effect.
+              - text: "done skip {'ana': 10}"
+                correct: true
+        - text: In production the dedup record and the side effect must commit together, for example in one database transaction with a unique key. For external effects such as payments, pass an idempotency key (like the order ID) so the provider deduplicates retries.
+        - text: "HTTP: GET, PUT and DELETE are idempotent by specification (RFC 9110); POST is not, since two POSTs may create two resources. APIs make POST retries safe with an Idempotency-Key header."
+          predict:
+            prompt: The first DELETE /items/7 returns 204, the retry returns 404. Is DELETE still idempotent?
+            options:
+              - text: No, the responses differ
+                explanation: Idempotency is about the effect on server state, not identical responses.
+              - text: Only if the server returns 204 both times
+                explanation: Either way the item is gone after one call or two.
+              - text: Yes, the item is deleted either way
+                correct: true
+        - text: A message that fails every time (a poison message) must not retry forever. After a maximum number of attempts it moves to a dead-letter queue (DLQ), where you can alert on it, inspect it and replay it.
+      takeaway: "Exactly-once in practice = at-least-once delivery + idempotent handlers; failing messages go to a DLQ."
+    items:
+      - id: architecture.idempotency-queues.mcq-at-least-once
+        type: mcq
+        prompt: Your queue guarantees at-least-once delivery. What must consumers be?
+        options:
+          - text: Idempotent — processing the same message twice has the same effect as once
+            correct: true
+            explanation: Redeliveries happen after timeouts, crashes before ack, and rebalances.
+          - text: Nothing special; at-least-once means exactly once
+            misconception: at-least-once-is-exactly-once
+            explanation: At-least-once explicitly allows duplicates.
+          - text: Fast, so duplicates cannot happen
+            misconception: speed-prevents-duplicates
+            explanation: A crash between processing and ack causes redelivery no matter how fast you are.
+        explanation: "\"Exactly once\" in practice = at-least-once delivery + idempotent processing."
+        hint: What happens if the consumer crashes after doing the work but before the ack?
+
+      - id: architecture.idempotency-queues.multi-http-idempotent
+        type: multi
+        prompt: Which HTTP methods are idempotent by specification (RFC 9110)?
+        options:
+          - text: GET
+            correct: true
+            explanation: Safe and idempotent.
+          - text: PUT
+            correct: true
+            explanation: Putting the same full representation twice leaves the same state.
+          - text: DELETE
+            correct: true
+            explanation: Deleting twice leaves the resource deleted (the second response may be 404).
+          - text: POST
+            misconception: post-is-idempotent
+            explanation: Two POSTs may create two resources; add an Idempotency-Key header to make retries safe.
+        explanation: Idempotent means the effect on server state, not identical responses.
+        hint: Which method usually creates something new?
+
+      - id: architecture.idempotency-queues.bug-double-charge
+        type: bug
+        prompt: "With at-least-once delivery, some customers are charged twice. Which line needs an idempotency guard?"
+        code: |
+          def handle(msg):
+              order = db.get_order(msg.order_id)
+              payments.charge(order.customer, order.total)
+              db.mark_paid(order.id)
+              queue.ack(msg)
+        bug_line: 3
+        explanation: A redelivered message charges again. Skip if the order is already paid and pass an idempotency key (e.g. the order ID) to the payment provider so retries are deduplicated.
+        hint: Which line has an external side effect?
+
+      - id: architecture.idempotency-queues.cloze-dlq
+        type: cloze
+        prompt: "Messages that fail processing after the maximum number of retries are moved to a ___ queue for inspection."
+        answers: ["dead-letter", "dead letter", "dlq"]
+        explanation: A DLQ stops a poison message from blocking or endlessly retrying, and lets you alert on and replay failures.
+        hint: Undeliverable mail ends up as a … letter.

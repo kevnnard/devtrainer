@@ -1,0 +1,533 @@
+track:
+  id: git
+  title: Git
+  description: Version control from the first commit to rebasing, remotes and undoing mistakes safely.
+  order: 20
+
+concepts:
+  - id: git.staging
+    title: The staging area
+    summary: >
+      git add copies changes into the index (staging area); git commit records
+      exactly what is in the index, not everything in the working tree.
+    level: beginner
+    lesson:
+      intro: "Git keeps three places: the working tree (your files), the index or staging area (the draft of the next commit) and the commits. Here a.txt and b.txt are already tracked."
+      example:
+        lang: shell
+        code: |
+          $ echo "v2" > a.txt
+          $ echo "v2" > b.txt
+          $ git add a.txt
+          $ git commit -m "update a"
+          $ git status --short
+      steps:
+        - text: Both files change in the working tree only. Git has not recorded anything yet.
+        - text: git add copies the current content of a.txt into the index. b.txt is still changed only in the working tree.
+          predict:
+            prompt: After git add a.txt, where is the new version of a.txt?
+            options:
+              - text: In the working tree and in the index
+                correct: true
+              - text: In a new commit
+                explanation: git add does not commit; it stages the change for the next commit.
+              - text: On the remote
+                explanation: Nothing leaves your machine until git push.
+        - text: git commit records exactly what is in the index, so the commit holds only the change to a.txt.
+        - text: "b.txt shows as modified but not staged ( M b.txt): its edit waits in the working tree for the next git add."
+          predict:
+            prompt: What does git status report for b.txt now?
+            options:
+              - text: Untracked
+                explanation: b.txt was already tracked; it is a tracked file with an unstaged edit.
+              - text: Modified, not staged
+                correct: true
+              - text: Nothing, it was committed too
+                explanation: The commit took the index, and b.txt was never added.
+      takeaway: git add puts changes in the index; git commit records the index, not the working tree.
+    items:
+      - id: git.staging.mcq-commit-records
+        type: mcq
+        prompt: "You edited a.txt and b.txt, then ran `git add a.txt` and `git commit -m \"x\"`. What does the commit contain?"
+        options:
+          - text: Only the change to a.txt
+            correct: true
+            explanation: Only a.txt was staged, so only a.txt is in the snapshot.
+          - text: The changes to a.txt and b.txt
+            misconception: commit-takes-worktree
+            explanation: git commit records the index, not the working tree; b.txt was never staged.
+          - text: Nothing, because the commit was not pushed
+            misconception: commit-needs-push
+            explanation: Committing is local; pushing only copies existing commits to a remote.
+        explanation: The index is the next commit's draft. git add puts changes in it; git commit snapshots it.
+        hint: Which file went through git add?
+
+      - id: git.staging.cmd-stage-all
+        type: command
+        prompt: Stage every change in the current directory, including new files.
+        answers:
+          - git add .
+          - git add -A
+          - git add --all
+        explanation: "`git add .` stages everything under the current directory; `-A` stages the whole work tree."
+        hint: The current directory is written as a single dot.
+
+      - id: git.staging.cmd-diff-staged
+        type: command
+        prompt: Show the changes that are staged for the next commit (not the unstaged ones).
+        answers:
+          - git diff --staged
+          - git diff --cached
+        explanation: "Plain `git diff` compares the working tree with the index; `--staged` (alias `--cached`) compares the index with HEAD."
+        hint: git diff takes a flag named after the staging area.
+
+      - id: git.staging.cloze-unstage
+        type: cloze
+        prompt: "Unstage a.txt but keep your edits in the working tree: git ___ a.txt"
+        answers: ["restore --staged", "reset", "reset HEAD", "reset --", "reset HEAD --"]
+        explanation: "`git restore --staged <file>` (Git 2.23+) copies the HEAD version back into the index; the working-tree edits stay. `git reset <file>` is the older equivalent."
+        hint: The modern command restores files; it needs a flag that targets the index.
+
+  - id: git.branches
+    title: Branches
+    summary: A branch is a movable pointer to a commit; creating one is cheap and does not copy files.
+    level: beginner
+    prereqs: [git.staging]
+    lesson:
+      intro: A branch is a name that points at one commit. Creating one writes a tiny file; nothing is copied.
+      example:
+        lang: shell
+        code: |
+          $ git log --oneline
+          3bd2e3c (HEAD -> main) add login
+          $ git branch feature
+          $ git branch
+            feature
+          * main
+          $ git switch feature
+          $ git commit -am "try idea"
+          $ git switch -c hotfix
+      steps:
+        - text: git branch feature writes .git/refs/heads/feature containing the hash 3bd2e3c. Both branches now point at the same commit; no files are duplicated.
+          predict:
+            prompt: Right after git branch feature, which branch are you on?
+            options:
+              - text: main
+                correct: true
+              - text: feature
+                explanation: git branch only creates the pointer; HEAD stays where it was.
+              - text: Both at once
+                explanation: HEAD points at exactly one branch at a time.
+        - text: git branch lists local branches and marks the current one with *. Add -a to include remote-tracking branches such as origin/main, or -r for only those.
+        - text: git switch feature moves HEAD to feature. A new commit is added on top of the branch HEAD points at, and only that branch moves forward.
+          predict:
+            prompt: You commit on feature. Which pointer moves to the new commit?
+            options:
+              - text: main and feature
+                explanation: main is not checked out, so it stays at 3bd2e3c.
+              - text: Neither, until you push
+                explanation: Commits are local; the current branch moves immediately.
+              - text: Only feature
+                correct: true
+        - text: git switch -c hotfix creates a branch at the current commit and switches to it in one step. The older equivalent is git checkout -b hotfix.
+      takeaway: "A branch is a movable pointer: git branch creates it, git switch moves HEAD to it, and -c does both."
+    items:
+      - id: git.branches.cloze-switch-create
+        type: cloze
+        prompt: "Create a branch named feature and switch to it in one command: git ___ feature"
+        answers:
+          - switch -c
+          - checkout -b
+          - switch --create
+        explanation: "`git switch -c <name>` (or the older `git checkout -b <name>`) creates the branch and moves HEAD to it."
+        hint: The modern command for changing branches is switch.
+
+      - id: git.branches.mcq-what-is
+        type: mcq
+        prompt: What does `git branch feature` actually create?
+        options:
+          - text: A new pointer named feature to the current commit
+            correct: true
+            explanation: A branch is a 41-byte ref file holding a commit hash; nothing is copied.
+          - text: A full copy of the project's files in a new directory
+            misconception: branch-copies-files
+            explanation: Branches share all objects; a separate directory would be a worktree (git worktree add).
+          - text: A new branch, and it also switches HEAD to it
+            misconception: branch-switches
+            explanation: git branch only creates the ref; you still need git switch feature.
+        explanation: Because branches are just pointers, creating and deleting them is instant.
+        hint: Think about what lives in .git/refs/heads/.
+
+      - id: git.branches.cmd-list-all
+        type: command
+        prompt: List local and remote-tracking branches.
+        answers:
+          - git branch -a
+          - git branch --all
+        explanation: "`-a` adds remote-tracking branches such as origin/main to the local list; `-r` shows only the remote ones."
+        hint: The flag means "all".
+
+  - id: git.history
+    title: History and HEAD
+    summary: >
+      Commits form a graph; HEAD points to the checked-out branch (or commit).
+      git log navigates it, and HEAD~n means n first-parents back.
+    level: beginner
+    prereqs: [git.staging]
+    lesson:
+      intro: Each commit points to its parent, so history is a chain you walk backwards from HEAD. HEAD is "where you are now".
+      example:
+        lang: shell
+        code: |
+          $ git log --oneline
+          682e2b9 (HEAD -> main) fix typo
+          c9fa72f add tests
+          3bd2e3c add login
+          $ git show --stat HEAD~2
+          $ git checkout c9fa72f
+          HEAD detached at c9fa72f
+      steps:
+        - text: "--oneline prints one line per commit, newest first: the short hash and the subject. git log -<n> keeps only the newest n commits."
+        - text: "Normally HEAD points to a branch (HEAD -> main) and the branch points to a commit. HEAD~1 is the parent of HEAD, HEAD~2 the grandparent, following first parents."
+          predict:
+            prompt: Which commit is HEAD~2 here?
+            options:
+              - text: c9fa72f add tests
+                explanation: That is HEAD~1, one step back.
+              - text: 3bd2e3c add login
+                correct: true
+        - text: git checkout c9fa72f points HEAD straight at a commit instead of at a branch. That is detached HEAD, a normal state for looking at old code.
+        - text: A commit made while detached belongs to no branch. When you switch away, only HEAD's reflog still remembers it, and Git warns you. Run git switch -c <name> first to keep the work.
+          predict:
+            prompt: You commit while detached, then git switch main. Where is that commit?
+            options:
+              - text: On main
+                explanation: main never moved; the commit was made on top of c9fa72f, not on main.
+              - text: Deleted right away
+                explanation: It still exists and can be found in the reflog until garbage collection.
+              - text: On no branch at all
+                correct: true
+      takeaway: "HEAD normally names a branch; HEAD~n walks n parents back; detached HEAD points at a commit directly."
+    items:
+      - id: git.history.cmd-last-three
+        type: command
+        prompt: Show only the last 3 commits of the current branch.
+        answers:
+          - git log -3
+          - git log -n 3
+          - git log -n3
+          - git log --max-count=3
+          - git log --max-count 3
+        explanation: "`-<n>` / `-n <n>` limits how many commits git log prints."
+        hint: git log accepts a number as a flag.
+
+      - id: git.history.cmd-oneline
+        type: command
+        prompt: Show the history with one short line per commit.
+        answers:
+          - git log --oneline
+          - git log --pretty=oneline --abbrev-commit
+        explanation: "`--oneline` is shorthand for `--pretty=oneline --abbrev-commit`: abbreviated hash plus subject."
+        hint: The flag literally says one line.
+
+      - id: git.history.mcq-detached
+        type: mcq
+        prompt: "After `git checkout a1b2c3d` (a commit hash), Git says you are in \"detached HEAD\". What does that mean?"
+        options:
+          - text: HEAD points directly at a commit instead of at a branch, so new commits belong to no branch
+            correct: true
+            explanation: Commits made here are reachable only through HEAD; create a branch (git switch -c) to keep them.
+          - text: The repository is corrupted and HEAD was deleted
+            misconception: detached-is-broken
+            explanation: Detached HEAD is a normal state used to inspect old commits.
+          - text: You are disconnected from the remote
+            misconception: detached-means-offline
+            explanation: HEAD is purely local; it has nothing to do with network access.
+        explanation: Normally HEAD → branch → commit. Detached means HEAD → commit.
+        hint: What does HEAD usually point to?
+
+  - id: git.remotes
+    title: Remotes, fetch, pull and push
+    summary: >
+      A remote is another copy of the repository. fetch downloads commits and
+      updates remote-tracking branches; pull = fetch + merge (or rebase); push
+      uploads your commits.
+    level: intermediate
+    prereqs: [git.branches]
+    lesson:
+      intro: A remote such as origin is another copy of the repository. Your repo keeps a local record of the remote's branches, and only a few commands refresh it.
+      example:
+        lang: shell
+        code: |
+          $ git fetch origin
+          $ git status -sb
+          ## main...origin/main [behind 2]
+          $ git log --oneline main..origin/main
+          $ git pull
+          $ git switch -c feature
+          $ git push -u origin feature
+      steps:
+        - text: origin/main is a remote-tracking branch, your local snapshot of where main was on origin the last time you talked to it.
+        - text: git fetch downloads the new commits and moves origin/main. It never touches your own branches or files, so you can inspect what arrived first.
+          predict:
+            prompt: After git fetch origin, has your local main changed?
+            options:
+              - text: No, only origin/main moved
+                correct: true
+              - text: Yes, it now matches origin/main
+                explanation: That is what pull does; fetch only updates remote-tracking branches.
+        - text: git status compares main with origin/main using local data. "behind 2" is only as fresh as your last fetch; status never contacts the remote.
+          predict:
+            prompt: Does git status itself contact origin?
+            options:
+              - text: Yes, it checks the server each time
+                explanation: It reads the cached origin/main; run git fetch to refresh it.
+              - text: Only when the branch has an upstream
+                explanation: An upstream tells status what to compare with, but the comparison still uses local data.
+              - text: No, it uses the last fetched state
+                correct: true
+        - text: git pull is fetch followed by a merge (or a rebase with --rebase). git push uploads your commits. Only fetch, pull, push, clone and ls-remote talk to the network.
+        - text: The first push of a new branch uses -u (--set-upstream) to record origin/feature as its upstream. After that, a bare git push or git pull knows where to go.
+      takeaway: fetch updates origin/*; pull = fetch + merge; push uploads; -u sets the upstream once.
+    items:
+      - id: git.remotes.mcq-fetch-vs-pull
+        type: mcq
+        prompt: What is the difference between `git fetch` and `git pull`?
+        options:
+          - text: fetch only updates remote-tracking branches like origin/main; pull also integrates them into your current branch
+            correct: true
+            explanation: pull runs fetch and then merge (or rebase with --rebase / pull.rebase=true).
+          - text: They are the same command with different names
+            misconception: fetch-equals-pull
+            explanation: fetch never touches your working tree or current branch; pull does.
+          - text: fetch downloads only the latest commit; pull downloads the full history
+            misconception: fetch-is-shallow
+            explanation: Both download every missing object for the fetched refs.
+        explanation: Fetch first when you want to inspect incoming changes before integrating them.
+        hint: Which one can create a merge commit in your branch?
+
+      - id: git.remotes.cmd-push-upstream
+        type: command
+        prompt: Push the new local branch feature to origin and set it as the upstream, so later a plain git push works.
+        answers:
+          - git push -u origin feature
+          - git push --set-upstream origin feature
+        explanation: "`-u` records origin/feature as the tracking branch; afterwards `git push` and `git pull` need no arguments."
+        hint: The short flag is -u.
+
+      - id: git.remotes.multi-network
+        type: multi
+        prompt: Which commands contact the remote over the network?
+        options:
+          - text: git fetch
+            correct: true
+            explanation: It downloads objects and refs from the remote.
+          - text: git pull
+            correct: true
+            explanation: It starts with a fetch.
+          - text: git push
+            correct: true
+            explanation: It uploads objects and updates remote refs.
+          - text: git status
+            misconception: status-checks-remote
+            explanation: "\"Your branch is behind origin/main\" compares with the last fetched state; status never contacts the remote."
+          - text: git commit
+            misconception: commit-needs-push
+            explanation: Committing is purely local.
+        explanation: Only fetch, pull, push (and clone, ls-remote) talk to the remote; everything else uses local data.
+        hint: Is "behind by 2 commits" fresh or cached information?
+
+  - id: git.merge-rebase
+    title: Merge and rebase
+    summary: >
+      merge joins histories (fast-forward or merge commit); rebase replays your
+      commits on a new base, rewriting their hashes. Never rebase commits
+      others already have.
+    level: intermediate
+    prereqs: [git.remotes, git.history]
+    lesson:
+      intro: "Two ways to combine work: merge joins two histories, rebase replays your commits on a new base. Here main got commit E after you branched feature (commits C and D)."
+      example:
+        lang: shell
+        code: |
+          # before:  A---E        main
+          #           \
+          #            C---D      feature
+          $ git switch feature
+          $ git rebase main
+          # after:   A---E---C'---D'
+          $ git switch main
+          $ git merge feature
+          Fast-forward
+      steps:
+        - text: main and feature have diverged. Merging now would create a merge commit with two parents, E and D.
+        - text: git rebase main finds where feature forked and replays C and D after E. A commit's hash covers its parent, so the replayed commits C' and D' get new hashes.
+          predict:
+            prompt: Do C' and D' keep the hashes of C and D?
+            options:
+              - text: Yes, the changes are identical
+                explanation: A hash covers the parent and the commit metadata too; a new parent means a new hash.
+              - text: No, they are new commits
+                correct: true
+        - text: Now main is an ancestor of feature, so git merge only moves main's pointer forward. That is a fast-forward, with no merge commit (use --no-ff if you want one anyway).
+          predict:
+            prompt: Why could git merge feature fast-forward this time?
+            options:
+              - text: main had no commits of its own left that feature lacked
+                correct: true
+              - text: merge always fast-forwards
+                explanation: Diverged histories need a merge commit.
+              - text: Rebase deleted main's commit E
+                explanation: E is still there; C' and D' were placed on top of it.
+        - text: "On a conflict Git stops and marks the file with <<<<<<<, ======= and >>>>>>>. Edit it, git add the file to mark it resolved, then git commit (or git rebase --continue during a rebase)."
+        - text: "Golden rule: rebase only commits nobody else has. Teammates still hold the old hashes, so their next pull duplicates the work. On shared branches merge, or agree first and use git push --force-with-lease."
+      takeaway: Merge joins histories (fast-forward when possible); rebase rewrites commits, so keep it to unshared work.
+    items:
+      - id: git.merge-rebase.mcq-fast-forward
+        type: mcq
+        prompt: main has not moved since you branched feature from it. What does `git merge feature` on main do?
+        options:
+          - text: A fast-forward — main's pointer simply moves to feature's tip, no merge commit
+            correct: true
+            explanation: When the target is an ancestor, there is nothing to combine; Git just moves the ref.
+          - text: Always creates a merge commit
+            misconception: merge-always-commit
+            explanation: Only when histories diverged, or when you pass --no-ff.
+          - text: Rebases feature onto main
+            misconception: merge-is-rebase
+            explanation: merge never rewrites commits; rebase does.
+        explanation: Use --no-ff if you want an explicit merge commit even when fast-forward is possible.
+        hint: Is main an ancestor of feature?
+
+      - id: git.merge-rebase.mcq-golden-rule
+        type: mcq
+        prompt: Why should you not rebase a branch that teammates have already pulled?
+        options:
+          - text: Rebase creates new commits with new hashes; others still have the old ones, so histories diverge and work gets duplicated
+            correct: true
+            explanation: Their next pull sees the old and new versions of the same changes.
+          - text: Rebase deletes the remote branch
+            misconception: rebase-deletes-remote
+            explanation: Rebase is local; the problem comes from force-pushing rewritten history.
+          - text: Rebase loses your changes
+            misconception: rebase-loses-changes
+            explanation: The changes are replayed; old commits remain reachable through the reflog.
+        explanation: Rebase local, unshared work freely; for shared branches merge, or coordinate and use git push --force-with-lease.
+        hint: What happens to commit hashes when they are replayed?
+
+      - id: git.merge-rebase.cmd-rebase-main
+        type: command
+        prompt: You are on feature. Replay its commits on top of your local main.
+        answers:
+          - git rebase main
+        explanation: "`git rebase main` finds the fork point and reapplies feature's commits after main's tip."
+        hint: The argument is the new base.
+
+      - id: git.merge-rebase.parsons-conflict
+        type: parsons
+        prompt: Order the steps to merge feature into main and resolve a conflict in app.go.
+        lines:
+          - "git switch main"
+          - "git merge feature"
+          - "# edit app.go: keep the right code, remove <<<<<<< ======= >>>>>>> markers"
+          - "git add app.go"
+          - "git commit"
+        explanation: Merge stops at the conflict; you fix the file, stage it to mark it resolved, then commit to conclude the merge (git merge --continue does the same).
+        hint: Staging a file is how you tell Git the conflict is resolved.
+
+  - id: git.undo
+    title: Undoing changes
+    summary: >
+      revert adds a new commit that undoes an old one (safe on shared
+      branches); reset moves the branch pointer (rewrites history); reflog
+      remembers where HEAD has been.
+    level: advanced
+    prereqs: [git.merge-rebase]
+    lesson:
+      intro: "Undoing in Git means one of two things: moving a branch back (reset, which rewrites history) or adding a commit that cancels an old one (revert)."
+      example:
+        lang: shell
+        code: |
+          $ git log --oneline
+          c3c3c3c (HEAD -> main) bad change
+          b2b2b2b good change
+          $ git reset --soft HEAD~1
+          $ git reset --mixed HEAD~1
+          $ git reset --hard HEAD~1
+          $ git revert c3c3c3c
+          $ git reflog
+      steps:
+        - text: The three reset lines are alternatives, not a sequence. Each moves main back to b2b2b2b; they differ in what else they reset.
+        - text: "--soft moves only the branch pointer: the bad change is still in the index, staged and ready to recommit."
+          predict:
+            prompt: After git reset --soft HEAD~1, where are the changes of the bad commit?
+            options:
+              - text: Gone for good
+                explanation: --soft leaves both the index and the working tree untouched.
+              - text: Unstaged, only in the working tree
+                explanation: That is --mixed, the default mode.
+              - text: Still staged in the index
+                correct: true
+        - text: "--mixed (the default) also resets the index, so the changes become unstaged. --hard also overwrites the working tree: uncommitted edits are lost. git restore <file> likewise overwrites a file with its index version."
+        - text: reset rewrites history, so never use it on commits others have. git revert adds a new commit with the inverse change; published history only moves forward.
+          predict:
+            prompt: After git revert c3c3c3c, how many commits does main have compared with before?
+            options:
+              - text: One more
+                correct: true
+              - text: One fewer
+                explanation: That would be reset; revert adds a commit instead of removing one.
+        - text: git reflog lists every recent position of HEAD (entries expire after 90 days, or 30 for commits no branch reaches), so a commit "lost" by reset --hard can be found and restored. Uncommitted changes never reach the reflog; commit or git stash before risky commands.
+      takeaway: "Unshared work: reset (soft keeps it staged, hard discards it). Shared work: revert. Lost commits: reflog."
+    items:
+      - id: git.undo.mcq-revert-shared
+        type: mcq
+        prompt: A bad commit is already on the shared main branch. How do you undo it safely?
+        options:
+          - text: git revert <commit>, then push
+            correct: true
+            explanation: Revert adds a new commit with the inverse change; nobody's history is rewritten.
+          - text: git reset --hard HEAD~1, then git push --force
+            misconception: reset-on-shared
+            explanation: This rewrites published history and breaks everyone who already pulled.
+          - text: Delete the commit file inside .git/objects
+            misconception: edit-git-internals
+            explanation: Objects are content-addressed and referenced by later commits; deleting them corrupts the repo.
+        explanation: Public history moves forward; revert, don't rewrite.
+        hint: Which option adds instead of removing?
+
+      - id: git.undo.multi-lose-work
+        type: multi
+        prompt: Which commands can permanently discard uncommitted changes?
+        options:
+          - text: git reset --hard
+            correct: true
+            explanation: It overwrites the index and working tree with HEAD.
+          - text: git restore app.go
+            correct: true
+            explanation: It overwrites the file with the index version; unstaged edits are gone.
+          - text: git reset --soft HEAD~1
+            misconception: soft-reset-loses-work
+            explanation: --soft only moves the branch pointer; index and working tree are untouched.
+          - text: git stash
+            misconception: stash-deletes
+            explanation: Stash saves the changes in a stash commit; git stash pop brings them back.
+        explanation: Uncommitted changes are not in the reflog — commit or stash before risky commands.
+        hint: Which ones touch the working tree without saving it anywhere?
+
+      - id: git.undo.cmd-soft-reset
+        type: command
+        prompt: Undo the last local commit but keep its changes staged.
+        answers:
+          - git reset --soft HEAD~1
+          - git reset --soft HEAD^
+          - git reset --soft HEAD~
+        explanation: "`--soft` moves the branch back one commit and leaves index and working tree as they were, so you can recommit."
+        hint: reset has three modes; you want the gentlest.
+
+      - id: git.undo.cloze-reflog
+        type: cloze
+        prompt: "After a mistaken `git reset --hard`, find the hash of the lost commit with git ___"
+        answers: ["reflog", "reflog show", "log -g"]
+        explanation: The reflog records every position of HEAD for about 90 days; `git reset --hard HEAD@{1}` usually brings the commit back.
+        hint: It is the log of references.

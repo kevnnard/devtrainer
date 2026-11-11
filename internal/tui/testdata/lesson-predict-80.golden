@@ -1,0 +1,24 @@
+
+  ┌─ Logic › Loops ────────────────────────────────────── lesson · step 2/3 ─┐
+  │                                                                          │
+  │ A for loop repeats its body while its condition holds.                   │
+  │                                                                          │
+  │  1  for i := 0; i < 3; i++ {                                         go  │
+  │  2      fmt.Println(i)                                                   │
+  │  3  }                                                                    │
+  │                                                                          │
+  │ ✓ 1  i := 0 runs once, before the first check of i < 3.                  │
+  │                                                                          │
+  │ ▸ 2  Predict: After the loop prints 2, what happens next?                │
+  │                                                                          │
+  │         1   i becomes 3 and the loop stops                               │
+  │       ▸ 2   It prints 3 and then stops                                   │
+  │                                                                          │
+  │ 1–9 or j/k enter predicts   s  skip lesson                               │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+
+ devtrainer │ 1 Home   2 Study   3 Tracks  4 Stats        lesson [✓●·] step 2/3
+                 1-9 predict · j/k move · enter choose · s skip lesson · ? help

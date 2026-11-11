@@ -1,0 +1,506 @@
+track:
+  id: linux
+  title: Linux & terminal
+  description: Files, permissions, pipes, processes and networking from the shell (GNU/Linux, bash).
+  order: 30
+
+concepts:
+  - id: linux.filesystem
+    title: Navigating the filesystem
+    summary: >
+      Everything hangs from /. Absolute paths start at /, relative paths start
+      at the current directory; . is here, .. is the parent, ~ is your home.
+    level: beginner
+    lesson:
+      intro: Every path starts somewhere. Absolute paths start at the root /; relative paths start at the current directory.
+      example:
+        lang: shell
+        code: |
+          $ pwd
+          /srv/app/logs
+          $ cd ..
+          $ cd ./config
+          $ cd /tmp
+          $ cd ~
+      steps:
+        - text: pwd prints the current directory. Every relative path is resolved from it.
+        - text: ".. is the parent directory, so cd .. moves up one level, from /srv/app/logs to /srv/app."
+          predict:
+            prompt: Where are you after cd .. ?
+            options:
+              - text: /
+                explanation: "/ is the root of everything; .. is only the parent."
+              - text: /srv/app
+                correct: true
+              - text: /srv
+                explanation: ".. goes up exactly one level: from logs to app."
+        - text: ". is the current directory, so ./config is /srv/app/config. Plain cd config means the same."
+          predict:
+            prompt: And after cd ./config ?
+            options:
+              - text: /config
+                explanation: ./config is relative; it starts at the current directory, /srv/app, not at /.
+              - text: /srv/app/config
+                correct: true
+        - text: cd /tmp starts with /, so it is absolute and works the same from anywhere. cd ~ (or plain cd) goes to your home directory.
+      takeaway: A leading / means absolute; anything else is relative to pwd, with . for here and .. for the parent.
+    items:
+      - id: linux.filesystem.cmd-list-hidden
+        type: command
+        prompt: List all files in the current directory, including hidden ones, in long format.
+        answers:
+          - ls -la
+          - ls -al
+          - ls -l -a
+          - ls -a -l
+          - ls -lA
+          - ls -Al
+        explanation: "`-l` is long format (permissions, owner, size, date); `-a` includes dotfiles. `-A` is the same without . and .."
+        hint: Hidden files start with a dot; the flag means all.
+
+      - id: linux.filesystem.cmd-mkdir-parents
+        type: command
+        prompt: Create the nested directories a/b/c in one command, even if a does not exist yet.
+        answers:
+          - mkdir -p a/b/c
+          - mkdir --parents a/b/c
+        explanation: "`-p` creates missing parents and does not fail if the directory already exists."
+        hint: The flag stands for parents.
+
+      - id: linux.filesystem.mcq-relative-path
+        type: mcq
+        prompt: You are in /home/ana/projects/api. Where does `cd ../web` take you?
+        options:
+          - text: /home/ana/projects/web
+            correct: true
+            explanation: .. is /home/ana/projects, then into its web subdirectory.
+          - text: /web
+            misconception: relative-is-absolute
+            explanation: Only paths starting with / are absolute.
+          - text: /home/ana/projects/api/web
+            misconception: dotdot-is-current
+            explanation: .. is the parent directory; the current one is a single dot.
+        explanation: Relative paths resolve from the current directory; .. climbs one level.
+        hint: Climb one level first.
+
+  - id: linux.permissions
+    title: Permissions
+    summary: >
+      Each file has read/write/execute bits for owner, group and others,
+      written as rwx or as octal digits (r=4, w=2, x=1).
+    level: beginner
+    prereqs: [linux.filesystem]
+    lesson:
+      intro: Every file has read, write and execute bits for three classes of users, the owner, the group and everyone else.
+      example:
+        lang: shell
+        code: |
+          $ stat -c '%A %a %n' deploy.sh
+          -rw-r--r-- 644 deploy.sh
+          $ chmod u+x deploy.sh
+          $ chmod 750 deploy.sh
+          $ mkdir private && chmod 600 private
+          $ cd private
+      steps:
+        - text: "Skip the first character, the file type (- file, d directory). Then come three triplets: owner rw-, group r--, others r--."
+        - text: "Each triplet is one octal digit: r = 4, w = 2, x = 1, added up. rw- is 6 and r-- is 4, so the mode is 644."
+        - text: chmod u+x adds execute for the owner only, giving -rwxr--r--, which is 744. Symbolic modes use u (owner), g (group), o (others), a (all) with + or -; plain +x adds it for all, minus the umask.
+          predict:
+            prompt: What is the mode after chmod u+x deploy.sh?
+            options:
+              - text: "-rwxr--r-- (744)"
+                correct: true
+              - text: "-rwxr-xr-x (755)"
+                explanation: u+x touches only the owner triplet; group and others keep r--.
+              - text: "-rw-r--r-x (645)"
+                explanation: u means the owning user, not others; others would be o+x.
+        - text: "chmod 750 sets every bit at once: 7 = rwx for the owner, 5 = r-x for the group, 0 = nothing for others."
+        - text: "On a directory the bits mean something else: r lists the names, w creates and deletes entries, x lets you enter it and reach the files inside. private is drw-------, so cd fails with Permission denied, even for the owner. Only root bypasses the bits."
+          predict:
+            prompt: You own private (mode drw-------). What happens on cd private?
+            options:
+              - text: It works, because owners can always enter
+                explanation: Owners are checked against the owner bits like anyone else; only root skips the check.
+              - text: It works, because r is set
+                explanation: r on a directory only lets you list its names.
+              - text: Permission denied, because x is missing
+                correct: true
+      takeaway: "Owner, group, others; r = 4, w = 2, x = 1 per digit; on directories x means enter."
+    items:
+      - id: linux.permissions.mcq-chmod-754
+        type: mcq
+        prompt: What permissions does `chmod 754 run.sh` set?
+        options:
+          - text: rwxr-xr--
+            correct: true
+            explanation: 7=4+2+1 (rwx) for the owner, 5=4+1 (r-x) for the group, 4 (r--) for others.
+          - text: rwxrw-r--
+            misconception: octal-five-is-rw
+            explanation: rw would be 6 (4+2); 5 is read + execute.
+          - text: r-xr--rwx
+            misconception: octal-order-reversed
+            explanation: The digits are owner, group, others — in that order.
+        explanation: Add r=4, w=2, x=1 for each of owner, group, others.
+        hint: Decompose each digit into 4, 2 and 1.
+
+      - id: linux.permissions.cloze-octal
+        type: cloze
+        prompt: "The permission string -rw-r----- is ___ in octal."
+        answers: ["640", "0640"]
+        explanation: Owner rw- = 6, group r-- = 4, others --- = 0. Common for config files with secrets readable by a service group.
+        hint: Skip the first character; it is the file type.
+
+      - id: linux.permissions.cmd-executable
+        type: command
+        prompt: Make the script deploy.sh executable.
+        answers:
+          - chmod +x deploy.sh
+          - chmod u+x deploy.sh
+          - chmod a+x deploy.sh
+          - chmod 755 deploy.sh
+        explanation: "`+x` adds execute for everyone allowed by the umask; `u+x` only for the owner. Then run it with ./deploy.sh."
+        hint: Add the execute bit symbolically.
+
+      - id: linux.permissions.mcq-dir-execute
+        type: mcq
+        prompt: A directory has mode drw-r--r-- and you own it. Why does `cd` into it fail?
+        options:
+          - text: On a directory, x means "may traverse/enter"; without it you cannot cd into it or access files inside
+            correct: true
+            explanation: r lets you list names, w lets you create/delete entries, x lets you pass through.
+          - text: Directories never need the x bit; the disk must be full
+            misconception: dir-x-unneeded
+            explanation: x is exactly what controls entering a directory.
+          - text: Owners bypass permissions, so it must be SELinux
+            misconception: owner-bypasses-perms
+            explanation: Only root bypasses permission bits; owners are checked against the owner bits.
+        explanation: Directories usually need r and x together (e.g. 755).
+        hint: What does x mean for something you cannot execute?
+
+  - id: linux.pipes
+    title: Pipes and redirection
+    summary: >
+      Programs read stdin and write stdout/stderr. | connects stdout to the
+      next stdin; > and >> redirect to files; 2>&1 sends stderr where stdout goes.
+    level: intermediate
+    prereqs: [linux.filesystem]
+    lesson:
+      intro: "Every program gets three streams: stdin (0), stdout (1) and stderr (2). The shell can point each of them at a file or at another program."
+      example:
+        lang: shell
+        code: |
+          $ printf 'b\na\nb\n' > names.txt
+          $ sort names.txt | uniq -c
+                1 a
+                2 b
+          $ sort names.txt | uniq -c | sort -rn \
+              | head -n 1
+          $ ls missing > out.log 2>&1
+      steps:
+        - text: "> sends stdout to a file and truncates the file first. >> opens it for appending instead."
+          predict:
+            prompt: You run the printf line twice. How many lines does names.txt have?
+            options:
+              - text: "6"
+                explanation: That would be >>; > empties the file before writing.
+              - text: "3"
+                correct: true
+        - text: "| connects the stdout of one program to the stdin of the next. sort puts equal lines next to each other."
+        - text: uniq compares each line only with the one before it, so it collapses adjacent duplicates. That is why it almost always follows sort. uniq -c adds a count to each line.
+        - text: sort -rn sorts the counts as numbers, biggest first, and head -n 1 keeps the top line. Pipelines like this answer "which value is most frequent?".
+          predict:
+            prompt: What does the second pipeline print?
+            options:
+              - text: "1 a"
+                explanation: -r reverses the order, so the highest count comes first.
+              - text: b
+                explanation: uniq -c prefixes each line with its count.
+              - text: "2 b"
+                correct: true
+        - text: "Redirections apply left to right: > out.log moves stdout to the file, then 2>&1 points stderr where stdout points now, so the error lands in out.log. Written as 2>&1 > out.log, stderr still goes to the terminal. In bash, &> out.log is a shorthand."
+      takeaway: "| feeds the next program, > truncates, >> appends, 2>&1 goes after the file redirect; sort before uniq."
+    items:
+      - id: linux.pipes.output-sort-uniq
+        type: output
+        prompt: What does this print (GNU coreutils)?
+        code: |
+          printf 'b\na\nb\nc\n' | sort | uniq | wc -l
+        answers: ["3"]
+        explanation: sort gives a b b c, uniq collapses adjacent duplicates to a b c, wc -l counts 3 lines.
+        hint: Write the lines after each stage.
+
+      - id: linux.pipes.output-uniq-adjacent
+        type: output
+        prompt: What does this print (GNU coreutils)?
+        code: |
+          printf 'b\na\nb\n' | uniq | wc -l
+        options:
+          - text: "3"
+            correct: true
+            explanation: The two b's are not adjacent, so uniq keeps all three lines.
+          - text: "2"
+            misconception: uniq-removes-all-dups
+            explanation: uniq only removes consecutive duplicates; that is why it is usually preceded by sort.
+          - text: "1"
+            misconception: wc-counts-words
+            explanation: wc -l counts lines, not unique values or words.
+        explanation: Use `sort -u` or `sort | uniq` for global deduplication.
+        hint: uniq compares each line only with the previous one.
+
+      - id: linux.pipes.mcq-redirect-order
+        type: mcq
+        prompt: Which command writes both stdout and stderr of build to out.log?
+        options:
+          - text: build > out.log 2>&1
+            correct: true
+            explanation: First stdout goes to the file, then stderr is duplicated to where stdout now points.
+          - text: build 2>&1 > out.log
+            misconception: redirect-order-irrelevant
+            explanation: Redirections apply left to right; stderr is copied to the terminal before stdout moves to the file.
+          - text: build | out.log
+            misconception: pipe-to-file
+            explanation: A pipe feeds another program; out.log would be run as a command.
+        explanation: In bash, `&> out.log` is a shorthand for the correct form.
+        hint: Redirections are processed left to right.
+
+      - id: linux.pipes.cloze-append
+        type: cloze
+        prompt: "Append a line to build.log without overwriting it: echo done ___ build.log"
+        answers: [">>"]
+        explanation: "`>` truncates the file first; `>>` opens it in append mode."
+        hint: Double the single redirect symbol.
+
+      - id: linux.pipes.cmd-count-errors
+        type: command
+        prompt: Print how many lines of app.log contain ERROR.
+        answers:
+          - grep -c ERROR app.log
+          - grep -c 'ERROR' app.log
+          - grep --count ERROR app.log
+          - grep ERROR app.log | wc -l
+        explanation: "`grep -c` counts matching lines directly; piping to `wc -l` works too but spawns another process."
+        hint: grep has a flag for counting.
+
+      - id: linux.pipes.parsons-top-ips
+        type: parsons
+        prompt: Order the pipeline stages that print the 3 most frequent client IPs (first field) of access.log.
+        lines:
+          - "cut -d ' ' -f 1 access.log"
+          - "| sort"
+          - "| uniq -c"
+          - "| sort -rn"
+          - "| head -n 3"
+        explanation: Extract the field, sort so duplicates are adjacent, count them with uniq -c, sort the counts numerically in reverse, keep the top 3.
+        hint: uniq needs sorted input, and the counts need their own sort.
+
+  - id: linux.processes
+    title: Processes and signals
+    summary: >
+      Every process has a PID, a parent, an exit status (0 = success) and
+      reacts to signals. SIGTERM asks politely; SIGKILL cannot be caught.
+    level: intermediate
+    prereqs: [linux.pipes]
+    lesson:
+      intro: A running program is a process with a PID, a parent, an exit status and handlers for signals.
+      example:
+        lang: shell
+        code: |
+          $ sleep 300 &
+          [1] 4242
+          $ ps -o pid,ppid,stat,cmd -p 4242
+              PID    PPID STAT CMD
+             4242    4100 S    sleep 300
+          $ kill 4242
+          $ wait 4242; echo $?
+          143
+          $ test -d /tmp && echo dir || echo no
+      steps:
+        - text: "& starts sleep in the background; the shell prints the job number and the PID. PPID 4100 is the shell, its parent. Every process except PID 1 has a parent; orphans are adopted by PID 1."
+        - text: "A plain kill sends SIGTERM (15): a request the process may catch to clean up and exit. kill -9 sends SIGKILL, which cannot be caught or ignored; the kernel ends the process with no cleanup."
+          predict:
+            prompt: A server must flush its data before it exits. Which signal gives it that chance?
+            options:
+              - text: SIGTERM
+                correct: true
+              - text: SIGKILL
+                explanation: SIGKILL cannot be caught, so no handler runs.
+        - text: "Exit status 0 means success and anything else failure; $? holds the last one. A process ended by a signal reports 128 + the signal number: 143 = 128 + 15."
+        - text: "&& runs the next command only on success and || only on failure. test -d /tmp succeeds, echo dir succeeds too, so || echo no is skipped."
+          predict:
+            prompt: /tmp exists. What does the last line print?
+            options:
+              - text: dir, then no
+                explanation: "|| runs only when the command before it failed, and echo dir succeeded."
+              - text: no
+                explanation: test -d /tmp returns 0 (success), so the && branch runs.
+              - text: dir
+                correct: true
+        - text: "A child that exited stays a zombie until its parent collects the status with wait(). Jobs started with & get SIGHUP when the terminal closes (use nohup, setsid or a service). Nice values go from -20 (most CPU) to 19 (least)."
+      takeaway: "kill sends SIGTERM (catchable), -9 sends SIGKILL (not); 0 is success; && on success, || on failure."
+    items:
+      - id: linux.processes.mcq-sigterm
+        type: mcq
+        prompt: What does a plain `kill 1234` send, and how does it differ from `kill -9 1234`?
+        options:
+          - text: SIGTERM, which the process can catch to clean up; -9 sends SIGKILL, which cannot be caught or ignored
+            correct: true
+            explanation: Graceful shutdown handlers run on SIGTERM; SIGKILL is handled by the kernel.
+          - text: SIGKILL; -9 is just a priority level
+            misconception: kill-default-sigkill
+            explanation: The default signal of kill is SIGTERM (15).
+          - text: SIGHUP, the same signal as closing the terminal
+            misconception: kill-default-sighup
+            explanation: SIGHUP (1) has to be requested explicitly with kill -HUP.
+        explanation: Send SIGTERM first and SIGKILL only if the process does not exit — the same thing docker stop does.
+        hint: The default signal number is 15.
+
+      - id: linux.processes.cmd-sigkill
+        type: command
+        prompt: Force-kill the process with PID 4242.
+        answers:
+          - kill -9 4242
+          - kill -KILL 4242
+          - kill -SIGKILL 4242
+          - kill -s KILL 4242
+          - kill -s SIGKILL 4242
+        explanation: SIGKILL (9) terminates immediately; the process gets no chance to flush or clean up.
+        hint: The signal number is 9.
+
+      - id: linux.processes.output-exit-status
+        type: output
+        prompt: What does this print?
+        code: |
+          false; echo $?
+          true && echo yes || echo no
+        answers: ["1\nyes"]
+        explanation: "`$?` holds the last exit status; false returns 1. `&&` runs on success (true returns 0), so echo yes runs and `||` is skipped."
+        hint: In the shell, 0 means success.
+
+      - id: linux.processes.multi-facts
+        type: multi
+        prompt: Which statements about Linux processes are true?
+        options:
+          - text: Every process except PID 1 has a parent process
+            correct: true
+            explanation: Processes are created by fork/exec; orphans are re-parented to PID 1 (or a subreaper).
+          - text: A zombie is a process that has exited but whose exit status the parent has not collected with wait()
+            correct: true
+            explanation: It holds only a process-table slot until it is reaped.
+          - text: A command started with & always survives closing the terminal
+            misconception: background-survives-hangup
+            explanation: The shell sends SIGHUP to its jobs on exit; use nohup, disown, setsid or a service manager.
+          - text: A higher nice value means a higher CPU priority
+            misconception: nice-higher-is-faster
+            explanation: Nice runs from -20 (most favored) to 19 (least); being "nicer" means yielding CPU.
+        explanation: These facts explain why containers need a proper PID 1 that reaps children and forwards signals.
+        hint: The word "nice" describes how kind the process is to others.
+
+  - id: linux.networking
+    title: Networking basics
+    summary: >
+      Hosts have IP addresses; services listen on ports; DNS maps names to IPs.
+      CIDR (/24) describes address ranges. Loopback (127.0.0.1) is local only.
+    level: intermediate
+    prereqs: [linux.processes]
+    lesson:
+      intro: To talk to a service you need its IP address and its port. DNS finds the address, and the service must listen on an interface you can reach.
+      example:
+        lang: shell
+        code: |
+          $ getent hosts db.lan
+          10.0.1.20       db.lan
+          $ ss -ltn          # columns trimmed
+          State   Local Address:Port
+          LISTEN  127.0.0.1:5432
+          LISTEN  0.0.0.0:8080
+          $ curl -I http://10.0.1.20:8080
+          HTTP/1.1 200 OK
+      steps:
+        - text: "DNS maps a name to an IP address: an A record for IPv4, AAAA for IPv6. Well-known TCP ports: 22 SSH, 80 HTTP, 443 HTTPS, 5432 PostgreSQL."
+        - text: "ss lists sockets: -l listening, -t TCP, -n numeric ports (no name lookups). Add -p to see the owning process, which needs root for other users' processes."
+        - text: 127.0.0.1 is loopback, reachable only from the same host, so the database on 5432 is local-only. 0.0.0.0 means every interface, so port 8080 accepts connections from other machines (if no firewall blocks them).
+          predict:
+            prompt: What does a listener on 0.0.0.0:8080 accept?
+            options:
+              - text: Nothing, 0.0.0.0 is not a real address
+                explanation: As a bind address it means all local interfaces.
+              - text: Connections on every interface of the host
+                correct: true
+              - text: Only connections from the same host
+                explanation: That is 127.0.0.1, the loopback interface.
+        - text: "CIDR /n says the first n of the 32 bits are the network; the rest pick the host. 10.0.1.0/24 leaves 8 host bits. Each extra prefix bit halves the range."
+          predict:
+            prompt: How many addresses does 10.0.0.0/28 contain?
+            options:
+              - text: "28"
+                explanation: /28 counts fixed network bits, not addresses.
+              - text: "4"
+                explanation: 32 - 28 = 4 is the number of host bits; the addresses are 2⁴.
+              - text: "16"
+                correct: true
+        - text: curl -I sends a HEAD request and prints only the status line and headers; -i shows the headers plus the body, -v the whole conversation.
+      takeaway: "DNS gives the IP, the port picks the service; 127.0.0.1 is local-only, 0.0.0.0 is every interface; /n leaves 32 - n host bits."
+    items:
+      - id: linux.networking.mcq-loopback
+        type: mcq
+        prompt: A server listens on 127.0.0.1:8080. Can another machine on the LAN reach it?
+        options:
+          - text: No — loopback is only reachable from the same host; bind 0.0.0.0 (all interfaces) to accept remote connections
+            correct: true
+            explanation: 127.0.0.0/8 never leaves the machine.
+          - text: Yes, if the firewall allows port 8080
+            misconception: loopback-is-public
+            explanation: No packet from another host can arrive on the loopback interface, firewall or not.
+          - text: Yes, 127.0.0.1 is the machine's public IP
+            misconception: loopback-is-public
+            explanation: 127.0.0.1 always means "this host" for every machine.
+        explanation: This is also why an app in a container listening on 127.0.0.1 is not reachable through a published port.
+        hint: Who else is "localhost"?
+
+      - id: linux.networking.mcq-cidr
+        type: mcq
+        prompt: How many IPv4 addresses does 10.0.1.0/24 contain?
+        options:
+          - text: "256"
+            correct: true
+            explanation: 32 - 24 = 8 host bits, 2⁸ = 256 addresses.
+          - text: "24"
+            misconception: cidr-is-count
+            explanation: /24 is the number of fixed network bits, not a count of addresses.
+          - text: "65,536"
+            misconception: cidr-bits-swapped
+            explanation: That is a /16 (16 host bits).
+        explanation: Each extra prefix bit halves the range; /16 = 65,536, /24 = 256, /28 = 16.
+        hint: Subtract the prefix from 32.
+
+      - id: linux.networking.cloze-dns-port
+        type: cloze
+        prompt: "DNS resolves host names to ___ addresses, and HTTPS listens on TCP port ___ by default."
+        answers: ["ip | 443", "ipv4 | 443", "ipv6 | 443"]
+        explanation: An A record maps a name to an IPv4 address (AAAA to IPv6). HTTP uses 80, HTTPS 443, SSH 22.
+        hint: The second blank is the TLS web port.
+
+      - id: linux.networking.cmd-listening
+        type: command
+        prompt: Show listening TCP sockets with numeric ports and the owning process, using ss.
+        answers:
+          - ss -ltnp
+          - ss -tlnp
+          - ss -lntp
+          - ss -tlpn
+          - ss -lnpt
+          - ss -tnlp
+          - ss -pltn
+          - sudo ss -ltnp
+          - sudo ss -tlnp
+        explanation: "-l listening, -t TCP, -n numeric (no name lookups), -p process. It replaces the older netstat -tlnp."
+        hint: Combine the flags for listening, TCP, numeric and process.
+
+      - id: linux.networking.cmd-curl-head
+        type: command
+        prompt: Fetch only the HTTP response headers of https://example.com with curl.
+        answers:
+          - curl -I https://example.com
+          - curl --head https://example.com
+        explanation: "`-I` sends a HEAD request and prints the status line and headers; `-i` would include headers plus the body."
+        hint: The flag is a capital letter.

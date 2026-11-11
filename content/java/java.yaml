@@ -1,0 +1,2010 @@
+track:
+  id: java
+  title: Java
+  description: >
+    Java 21 — primitives and references, equality, classes and interfaces,
+    records and sealed types with pattern matching, generics, collections,
+    exceptions, streams, Optional, virtual threads and JVM memory. Snippets
+    leave out the enclosing class, main and the java.util imports.
+  order: 62
+
+concepts:
+  - id: java.basics
+    title: Primitives, references and var
+    summary: >
+      Eight primitive types hold values; everything else is reached through a
+      reference. int arithmetic truncates and overflows silently, char is a
+      number, arguments are passed by value, and var is static type inference.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: Java has two kinds of variables. Primitives (int, long, double, char, boolean...) hold the value itself; every other variable holds a reference to an object.
+      example:
+        lang: java
+        code: |
+          int a = 7, b = 2;
+          System.out.println(a / b + " " + a % b + " " + (double) a / b);
+          int big = Integer.MAX_VALUE;
+          System.out.println(big + 1);
+          char c = 'A';
+          System.out.println(c + 1);
+          System.out.println((char) (c + 1));
+          int[] xs = {1, 2};
+          int[] ys = xs;
+          ys[0] = 9;
+          System.out.println(xs[0]);
+          var name = "Ada";
+      steps:
+        - text: "int / int is integer division and drops the fraction (it truncates toward zero): 7 / 2 is 3 and 7 % 2 is 1. A cast binds tighter than /, so (double) a / b converts 7 to 7.0 first and gives 3.5."
+          predict:
+            prompt: What does the first println print?
+            options:
+              - text: "3.5 1 3.5"
+                explanation: Both operands of a / b are int, so the division is integer division.
+              - text: "3 1 3.5"
+                correct: true
+              - text: "3 1 3.0"
+                explanation: The cast applies to a before dividing, so the division itself is done in double.
+        - text: int is a 32-bit two's complement number. Integer.MAX_VALUE + 1 wraps around to -2147483648 with no error. Use long for bigger values, or Math.addExact to get an exception on overflow.
+          predict:
+            prompt: What does big + 1 print?
+            options:
+              - text: "2147483648"
+                explanation: That value does not fit in an int; the result is computed as an int and wraps.
+              - text: An ArithmeticException
+                explanation: Integer overflow is silent. Only integer division by zero and the Math.*Exact methods throw.
+              - text: "-2147483648"
+                correct: true
+        - text: char is a 16-bit numeric type. c + 1 promotes 'A' (65) to int and prints 66; casting back with (char) prints B.
+        - text: "Arrays and objects live behind references. ys = xs copies the reference, not the array, so both names point to the same array and xs[0] prints 9."
+          predict:
+            prompt: What does xs[0] print?
+            options:
+              - text: "9"
+                correct: true
+              - text: "1"
+                explanation: ys = xs does not copy the array; both variables refer to the same one.
+        - text: "var (Java 10+) lets the compiler infer a local variable's type from its initializer. name is a String at compile time, so name = 42 would not compile: var is not dynamic typing."
+      takeaway: Primitives hold values, other variables hold references; int division truncates, int overflow wraps silently, and var is still static typing.
+    items:
+      - id: java.basics.output-concat
+        type: output
+        prompt: What does this print?
+        code: |
+          System.out.println(1 + 2 + "3" + 4 + 5);
+          System.out.println('a' + 'b' + "!");
+        answers: ["3345\n195!"]
+        explanation: "+ is evaluated left to right. 1 + 2 is int addition (3); once a String is involved every following + concatenates, giving 3345. 'a' + 'b' adds two chars as ints (97 + 98 = 195) before the String appears."
+        hint: Evaluate left to right and track when the left operand becomes a String.
+
+      - id: java.basics.mcq-var
+        type: mcq
+        prompt: What happens with this code?
+        code: |
+          var count = 10;
+          count = "ten";
+        options:
+          - text: It does not compile, because count was inferred as int
+            correct: true
+            explanation: var infers the type once, from the initializer; after that the variable is an ordinary int.
+          - text: count becomes a String holding "ten"
+            misconception: var-is-dynamic
+            explanation: var is not dynamic typing like JavaScript's let; the type is fixed at compile time.
+          - text: It compiles but throws a ClassCastException at runtime
+            misconception: var-checked-at-runtime
+            explanation: The mismatch is caught by the compiler; nothing about var is checked at runtime.
+        explanation: var only saves typing the type; the variable is still statically typed. It works only for local variables with an initializer.
+        hint: When does the compiler decide the type of count?
+
+      - id: java.basics.output-pass-by-value
+        type: output
+        prompt: What does this print?
+        code: |
+          static void change(int[] arr, int n) {
+              arr[0] = 99;
+              arr = new int[] {-1};
+              n = 99;
+          }
+          int[] data = {1};
+          int n = 1;
+          change(data, n);
+          System.out.println(data[0] + " " + n);
+        options:
+          - text: "99 1"
+            correct: true
+            explanation: arr receives a copy of the reference, so arr[0] = 99 changes the caller's array. Reassigning arr and n only changes the method's own copies.
+          - text: "-1 99"
+            misconception: java-pass-by-reference
+            explanation: Java passes everything by value. For objects the value is a reference, so reassigning the parameter never affects the caller's variable.
+          - text: "1 1"
+            misconception: array-param-copied
+            explanation: The array itself is not copied; the method writes into the same array the caller holds.
+        explanation: Java is always pass-by-value; for objects and arrays the value copied is the reference.
+        hint: Which assignments touch the shared array, and which only rebind a local name?
+
+      - id: java.basics.command-source-launch
+        type: command
+        prompt: Run the single-file program Hello.java directly, without calling javac first.
+        answers:
+          - java Hello.java
+        explanation: Since Java 11 the launcher compiles a single source file in memory and runs it. For several files or a real project, compile with javac (or a build tool) first.
+        hint: The same command that runs classes, given the .java file.
+
+      - id: java.basics.code-average-overflow
+        type: code
+        language: java
+        prompt: Print the exact average of the scores, then the value one past Integer.MAX_VALUE without overflowing. Change only the two marked lines.
+        starter: |
+          public class Main {
+              public static void main(String[] args) {
+                  int[] scores = {7, 8, 8};
+                  int sum = 0;
+                  for (int s : scores) sum += s;
+                  double average = sum / scores.length; // fix
+                  System.out.println(average);
+
+                  int big = Integer.MAX_VALUE;
+                  long next = big + 1; // fix
+                  System.out.println(next);
+              }
+          }
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  int[] scores = {7, 8, 8};
+                  int sum = 0;
+                  for (int s : scores) sum += s;
+                  double average = (double) sum / scores.length;
+                  System.out.println(average);
+
+                  int big = Integer.MAX_VALUE;
+                  long next = big + 1L;
+                  System.out.println(next);
+              }
+          }
+        expected: |
+          7.666666666666667
+          2147483648
+        explanation: The type of an expression depends on its operands, not on the variable it is stored in. int / int truncates to 7 before the widening to double, and int + int overflows to -2147483648 before the widening to long. Making one operand double (or long) changes the whole operation.
+        hint: When is the result converted to double or long — before or after the operation?
+
+  - id: java.strings
+    title: Strings and equality
+    summary: >
+      String is an immutable reference type. == compares identity, equals
+      compares characters. Literals are interned, string methods return new
+      strings, and text blocks write multi-line strings.
+    level: beginner
+    prereqs: [java.basics]
+    lesson:
+      intro: Strings look like values but are objects. That makes == a trap and explains why methods like toUpperCase never change the original.
+      example:
+        lang: java
+        code: |
+          String a = "hi";
+          String b = "hi";
+          String c = new String("hi");
+          System.out.println(a == b);
+          System.out.println(a == c);
+          System.out.println(a.equals(c));
+          String s = "abc";
+          s.toUpperCase();
+          System.out.println(s + " " + s.toUpperCase());
+          String json = """
+              {"id": 1}
+              """;
+          System.out.print(json);
+      steps:
+        - text: "== on references asks \"is this the same object?\". Identical string literals are interned into one shared pool, so a and b point to the same String and a == b prints true."
+        - text: new String("hi") always creates a new object, so a == c is false even though the characters match.
+          predict:
+            prompt: What does a == c print?
+            options:
+              - text: "true"
+                explanation: == compares references, and new String always makes a separate object.
+              - text: "false"
+                correct: true
+        - text: equals compares the characters, so a.equals(c) is true. Compare strings with equals, or Objects.equals(x, y) when either side can be null.
+        - text: Strings are immutable. toUpperCase returns a new String; the call on its own line throws the result away, so s is still abc.
+          predict:
+            prompt: What does the line with s + " " + s.toUpperCase() print?
+            options:
+              - text: ABC ABC
+                explanation: The first toUpperCase result was discarded; s itself never changes.
+              - text: abc ABC
+                correct: true
+        - text: "A text block (Java 15+) opens with \"\"\" and a line break. The indentation shared by its lines and the closing \"\"\" is removed, so this prints {\"id\": 1} and a newline. To build a string in a loop, use StringBuilder."
+      takeaway: Compare strings with equals, never ==; every String method returns a new string; text blocks strip their common indentation.
+    items:
+      - id: java.strings.output-runtime-concat
+        type: output
+        prompt: What does this print?
+        code: |
+          String x = "java";
+          String y = "ja";
+          String z = y + "va";
+          System.out.println((x == z) + " " + x.equals(z));
+        options:
+          - text: "false true"
+            correct: true
+            explanation: y is not a constant, so y + "va" is computed at runtime and creates a new String. Same characters, different object.
+          - text: "true true"
+            misconception: double-equals-compares-content
+            explanation: == compares references. Only compile-time constants such as "ja" + "va" are interned automatically.
+          - text: "false false"
+            misconception: equals-compares-identity
+            explanation: String.equals compares the characters, which are the same.
+        explanation: Whether == happens to be true depends on interning; never rely on it for strings.
+        hint: Is y + "va" known at compile time?
+
+      - id: java.strings.bug-double-equals
+        type: bug
+        prompt: 'reply("QUIT ") returns "unknown: quit". Which line is the bug?'
+        code: |
+          static String reply(String cmd) {
+              String clean = cmd.trim().toLowerCase();
+              if (clean == "quit") {
+                  return "bye";
+              }
+              return "unknown: " + clean;
+          }
+        bug_line: 3
+        explanation: trim and toLowerCase build a new String at runtime, so it is never the same object as the literal "quit". Use "quit".equals(clean).
+        hint: Which comparison checks identity instead of characters?
+
+      - id: java.strings.output-text-block
+        type: output
+        prompt: What does this print? (Each space is shown as a dot.)
+        code: |
+          String t = """
+                  a
+                    b
+                  """;
+          System.out.print(t.replace(' ', '.'));
+        answers: ["a\n..b"]
+        explanation: The closing """ is as indented as a, so that common indentation is stripped. b keeps its two extra spaces, and each line ends with a newline.
+        hint: Which indentation do all the lines, including the closing delimiter, share?
+
+      - id: java.strings.mcq-stringbuilder
+        type: mcq
+        prompt: Why use a StringBuilder instead of s += piece inside a loop that runs n times?
+        options:
+          - text: Strings are immutable, so each += copies everything built so far (O(n²) total); StringBuilder appends into a growable buffer
+            correct: true
+            explanation: StringBuilder grows its buffer geometrically, so n appends cost O(n) amortized.
+          - text: "+= on a String is not allowed inside loops"
+            misconception: string-plus-forbidden
+            explanation: It compiles and works; it is just slow for many iterations.
+          - text: "+= changes the String in place, but StringBuilder does it faster"
+            misconception: string-mutable
+            explanation: A String never changes; += creates a new String and rebinds the variable.
+          - text: StringBuilder is thread-safe and String is not
+            misconception: stringbuilder-thread-safe
+            explanation: StringBuilder is not synchronized (StringBuffer is). String is immutable and therefore already safe to share.
+        explanation: A single s = a + b + c is fine; the compiler optimizes it. The cost appears when += repeats in a loop.
+        hint: What does += do to an immutable object?
+
+      - id: java.strings.code-equals
+        type: code
+        language: java
+        prompt: Count the inputs whose text is admin. All three are, but only one is counted.
+        starter: |
+          public class Main {
+              public static void main(String[] args) {
+                  String[] inputs = {"admin", new String("admin"), " admin ".strip(), "Admin"};
+                  int admins = 0;
+                  for (String input : inputs) {
+                      if (input == "admin") admins++;
+                  }
+                  System.out.println(admins + " admins");
+              }
+          }
+        solution: |
+          public class Main {
+              public static void main(String[] args) {
+                  String[] inputs = {"admin", new String("admin"), " admin ".strip(), "Admin"};
+                  int admins = 0;
+                  for (String input : inputs) {
+                      if (input.equals("admin")) admins++;
+                  }
+                  System.out.println(admins + " admins");
+              }
+          }
+        expected: |
+          3 admins
+        explanation: "== on objects compares references. Only the literal shares the interned \"admin\" object; new String(...) and strip() build new String objects with the same characters. equals compares the characters. \"Admin\" differs in case, so it is not counted (equalsIgnoreCase would count it)."
+        hint: Does == compare the text or the object?
+
+  - id: java.classes
+    title: Classes, interfaces and inheritance
+    summary: >
+      Interfaces declare behavior (with default methods), classes implement
+      them and extend one superclass. Overriding is chosen at runtime by the
+      object's class; overloading is chosen at compile time by static types.
+    level: beginner
+    prereqs: [java.strings]
+    lesson:
+      intro: A variable has a declared type, and the object it refers to has a runtime class. The declared type decides what compiles; the runtime class decides which override runs.
+      example:
+        lang: java
+        code: |
+          interface Shape {
+              double area();
+              default String label() { return "area " + area(); }
+          }
+          class Square implements Shape {
+              private final double side;
+              Square(double side) { this.side = side; }
+              public double area() { return side * side; }
+          }
+          class Animal { String sound() { return "..."; } }
+          class Dog extends Animal {
+              @Override String sound() { return "woof"; }
+          }
+          Animal pet = new Dog();
+          System.out.println(pet.sound() + " " + new Square(3).label());
+      steps:
+        - text: "An interface lists what a type can do. Square implements Shape by providing area(). label() is a default method: it has a body in the interface and calls area()."
+          predict:
+            prompt: What does new Square(3).label() return?
+            options:
+              - text: Nothing; interface methods cannot have bodies, so this does not compile
+                explanation: Since Java 8 interfaces can have default and static methods with bodies.
+              - text: "\"area 9.0\""
+                correct: true
+        - text: Dog extends Animal and overrides sound(). @Override asks the compiler to check that the method really overrides something, which catches typos in names and parameter types.
+        - text: pet is declared as Animal but refers to a Dog. A call to an overridden method is resolved at runtime from the object's class (dynamic dispatch), so pet.sound() is woof. The line prints woof area 9.0.
+          predict:
+            prompt: What does pet.sound() return?
+            options:
+              - text: "\"...\""
+                explanation: Overrides are picked from the object's runtime class, not from the variable's declared type.
+              - text: "\"woof\""
+                correct: true
+        - text: "The declared type still limits what compiles: if Dog had a fetch() method, pet.fetch() would not compile without a cast."
+        - text: "Overloading (same name, different parameter types) is resolved at compile time from the declared types of the arguments. Only overriding is dynamic; fields and static methods are not polymorphic."
+      takeaway: Declared type decides what compiles and which overload; the object's class decides which override runs.
+    items:
+      - id: java.classes.output-overload-static
+        type: output
+        prompt: What does this print?
+        code: |
+          static String describe(Object o) { return "object"; }
+          static String describe(String s) { return "string"; }
+          Object o = "hi";
+          System.out.println(describe(o) + " " + o.toString());
+        options:
+          - text: "object hi"
+            correct: true
+            explanation: The overload is picked at compile time from o's declared type, Object. toString is an override, so String's version runs.
+          - text: "string hi"
+            misconception: overload-chosen-at-runtime
+            explanation: Overload resolution uses static types only; the compiler sees an Object argument.
+          - text: "object java.lang.Object@1b6d3586"
+            misconception: override-uses-static-type
+            explanation: toString is overridden by String and dispatched on the runtime class, so it returns hi.
+        explanation: Overloading is static, overriding is dynamic. Mixing the two in one call is a classic interview question.
+        hint: Which of the two calls is an overload choice, and which is an override?
+
+      - id: java.classes.output-self-call
+        type: output
+        prompt: What does this print?
+        code: |
+          class A {
+              String who() { return "A"; }
+              String hello() { return "I am " + who(); }
+          }
+          class B extends A {
+              @Override String who() { return "B"; }
+          }
+          System.out.println(new B().hello());
+        answers: ["I am B"]
+        explanation: hello() is inherited from A, but its call to who() is dispatched on the object, which is a B. Calls on this are virtual too.
+        hint: Inside hello(), what is this?
+
+      - id: java.classes.multi-interfaces
+        type: multi
+        prompt: Which statements about Java 21 classes and interfaces are true?
+        options:
+          - text: A class can implement several interfaces
+            correct: true
+            explanation: class C implements A, B is allowed.
+          - text: An interface can have default and static methods with bodies
+            correct: true
+            explanation: Default methods (Java 8) give implementations; private interface methods arrived in Java 9.
+          - text: A class can extend two classes
+            misconception: multiple-class-inheritance
+            explanation: Java allows only one superclass. Share behavior through interfaces or composition.
+          - text: A field declared in an interface is a per-object instance field
+            misconception: interface-instance-fields
+            explanation: Interface fields are implicitly public static final constants.
+        explanation: One superclass, any number of interfaces; interfaces carry behavior but no instance state.
+        hint: Where can instance state live?
+
+      - id: java.classes.bug-super-constructor
+        type: bug
+        prompt: javac rejects this code. Which line does it report?
+        code: |
+          class Account {
+              final String id;
+              Account(String id) { this.id = id; }
+          }
+          class Savings extends Account {
+              double rate;
+              Savings(String id, double rate) {
+                  this.rate = rate;
+              }
+          }
+        bug_line: 7
+        explanation: A constructor that does not call this(...) or super(...) gets an implicit super(), but Account has no no-argument constructor. Add super(id); as the first statement of Savings(...).
+        hint: What does a constructor call first when you write nothing?
+
+      - id: java.classes.code-super-pay
+        type: code
+        language: java
+        prompt: A manager earns what an engineer earns plus 50. Fix Manager.pay() so it builds on Engineer's pay instead of hard-coding it.
+        starter: |
+          import java.util.List;
+
+          public class Main {
+              public static void main(String[] args) {
+                  List<Employee> staff = List.of(new Engineer("Ana"), new Manager("Bo"));
+                  int total = 0;
+                  for (Employee e : staff) {
+                      System.out.println(e);
+                      total += e.pay();
+                  }
+                  System.out.println("total " + total);
+              }
+          }
+
+          abstract class Employee {
+              private final String name;
+              Employee(String name) { this.name = name; }
+              abstract int pay();
+              @Override public String toString() { return name + " " + pay(); }
+          }
+
+          class Engineer extends Employee {
+              Engineer(String name) { super(name); }
+              @Override int pay() { return 100; }
+          }
+
+          class Manager extends Engineer {
+              Manager(String name) { super(name); }
+              @Override int pay() { return 50; }
+          }
+        solution: |
+          import java.util.List;
+
+          public class Main {
+              public static void main(String[] args) {
+                  List<Employee> staff = List.of(new Engineer("Ana"), new Manager("Bo"));
+                  int total = 0;
+                  for (Employee e : staff) {
+                      System.out.println(e);
+                      total += e.pay();
+                  }
+                  System.out.println("total " + total);
+              }
+          }
+
+          abstract class Employee {
+              private final String name;
+              Employee(String name) { this.name = name; }
+              abstract int pay();
+              @Override public String toString() { return name + " " + pay(); }
+          }
+
+          class Engineer extends Employee {
+              Engineer(String name) { super(name); }
+              @Override int pay() { return 100; }
+          }
+
+          class Manager extends Engineer {
+              Manager(String name) { super(name); }
+              @Override int pay() { return super.pay() + 50; }
+          }
+        expected: |
+          Ana 100
+          Bo 150
+          total 250
+        explanation: super.pay() calls the parent's version of the method you are overriding. Calls through this are dynamic, so Employee.toString() runs Manager's pay() for Bo even though toString is declared in Employee. With java Main.java the class with main must come first in the file.
+        hint: How does an override call the version it replaces?
+
+  - id: java.records-sealed
+    title: Records, sealed types and pattern matching
+    summary: >
+      Records are immutable data carriers with generated constructor,
+      accessors, equals, hashCode and toString. Sealed types list their
+      subtypes, so a pattern-matching switch over them is checked for
+      exhaustiveness at compile time.
+    level: intermediate
+    prereqs: [java.classes]
+    lesson:
+      intro: 'Java 21 can model "a value is exactly one of these shapes" directly: a sealed interface, one record per case, and a switch that the compiler checks covers them all.'
+      example:
+        lang: java
+        code: |
+          sealed interface Shape permits Circle, Rect {}
+          record Circle(double r) implements Shape {}
+          record Rect(double w, double h) implements Shape {}
+          static String describe(Shape s) {
+              return switch (s) {
+                  case Circle c -> "circle " + c.r();
+                  case Rect(double w, double h) when w == h -> "square " + w;
+                  case Rect(double w, double h) -> "rect " + w * h;
+              };
+          }
+          var r = new Rect(2, 3);
+          System.out.println(r + " " + r.equals(new Rect(2, 3)));
+          System.out.println(describe(r) + ", " + describe(new Rect(2, 2)));
+      steps:
+        - text: "A record declares its components once. Java generates private final fields, a constructor, accessors named after the components (r(), w(), h(), with no get prefix), and equals, hashCode and toString based on the components."
+          predict:
+            prompt: What does the first println print?
+            options:
+              - text: "Rect@1b6d3586 false"
+                explanation: Records generate toString and a component-based equals.
+              - text: "Rect[w=2, h=3] true"
+                explanation: The components are doubles; the int arguments were widened to 2.0 and 3.0.
+              - text: "Rect[w=2.0, h=3.0] true"
+                correct: true
+        - text: "sealed ... permits lists every allowed implementation. A permitted subtype must be final, sealed or non-sealed; records are implicitly final."
+        - text: "case Circle c tests the type and binds c. case Rect(double w, double h) is a record pattern: it tests and deconstructs in one step. when adds a guard. Cases are tried from top to bottom."
+          predict:
+            prompt: What does describe(new Rect(2, 2)) return?
+            options:
+              - text: "\"square 2.0\""
+                correct: true
+              - text: "\"rect 4.0\""
+                explanation: The guarded case comes first and its guard w == h is true.
+        - text: The switch needs no default. Shape is sealed, so the compiler knows every subtype and checks the cases are exhaustive. Adding a Triangle to permits makes this switch fail to compile until it is handled; a default branch would hide that.
+        - text: "Order matters: an unguarded case Rect placed before the guarded one would match every Rect, so javac rejects the later case as dominated."
+      takeaway: Records model data, sealed types close the set of cases, and switch patterns plus the compiler's exhaustiveness check replace instanceof chains.
+    items:
+      - id: java.records-sealed.output-record-members
+        type: output
+        prompt: What does this print?
+        code: |
+          record Point(int x, int y) {}
+          var a = new Point(1, 2);
+          var b = new Point(1, 2);
+          System.out.println(a + " " + (a == b) + " " + a.equals(b) + " " + a.x());
+        answers: ["Point[x=1, y=2] false true 1"]
+        explanation: Records generate toString as Name[comp=value, ...], a component-based equals and accessor methods. == still compares references, and a and b are two objects.
+        hint: Records change equals, not ==.
+
+      - id: java.records-sealed.mcq-new-subtype
+        type: mcq
+        prompt: "Shape is sealed with permits Circle, Rect, and a switch over Shape handles both with no default. You add record Triangle(...) implements Shape to permits. What happens when you rebuild?"
+        options:
+          - text: The switch fails to compile because it no longer covers every Shape
+            correct: true
+            explanation: Exhaustiveness is checked at compile time against the permitted subtypes, so the compiler lists every switch to update.
+          - text: It compiles, and the switch throws a MatchException when it sees a Triangle
+            misconception: sealed-checked-at-runtime
+            explanation: MatchException only guards against classes compiled separately later; recompiling the switch reports the gap.
+          - text: It compiles, and Triangle falls through to the last case
+            misconception: switch-falls-through
+            explanation: Pattern cases never fall through, and no case matches a Triangle.
+        explanation: Avoid default on switches over sealed types, so the compiler keeps telling you which cases are missing.
+        hint: What does sealed let the compiler know?
+
+      - id: java.records-sealed.bug-dominated-case
+        type: bug
+        prompt: javac rejects this switch. Which line does it report?
+        code: |
+          static String kind(Object o) {
+              return switch (o) {
+                  case Integer i -> "int " + i;
+                  case CharSequence cs -> "text " + cs;
+                  case String s -> "string " + s;
+                  default -> "other";
+              };
+          }
+        bug_line: 5
+        explanation: String is a CharSequence, so case CharSequence already matches every String and case String can never run. Put the more specific pattern first.
+        hint: Which case can never be reached?
+
+      - id: java.records-sealed.cloze-compact-constructor
+        type: cloze
+        prompt: "record Range(int lo, int hi) { Range { if (lo > hi) throw new IllegalArgumentException(); } } — a record constructor written without a parameter list is called a ___ constructor."
+        answers: ["compact"]
+        explanation: A compact constructor runs before the fields are assigned from the (implicit) parameters, which makes it the place for validation and normalization.
+        hint: It is the short form of the canonical constructor.
+
+      - id: java.records-sealed.code-exhaustive-switch
+        type: code
+        language: java
+        prompt: Circles get area 0 because default swallows them. Replace default with a case for Circle so the compiler checks every permitted shape.
+        starter: |
+          import java.util.List;
+
+          public class Main {
+              sealed interface Shape permits Circle, Square, Rect {}
+              record Circle(double r) implements Shape {}
+              record Square(double side) implements Shape {}
+              record Rect(double w, double h) implements Shape {}
+
+              static double area(Shape s) {
+                  return switch (s) {
+                      case Square sq -> sq.side() * sq.side();
+                      case Rect(double w, double h) -> w * h;
+                      default -> 0;
+                  };
+              }
+
+              public static void main(String[] args) {
+                  for (Shape s : List.of(new Square(2), new Rect(2, 3), new Circle(1))) {
+                      System.out.println(s + " " + Math.round(area(s) * 100) / 100.0);
+                  }
+              }
+          }
+        solution: |
+          import java.util.List;
+
+          public class Main {
+              sealed interface Shape permits Circle, Square, Rect {}
+              record Circle(double r) implements Shape {}
+              record Square(double side) implements Shape {}
+              record Rect(double w, double h) implements Shape {}
+
+              static double area(Shape s) {
+                  return switch (s) {
+                      case Square sq -> sq.side() * sq.side();
+                      case Rect(double w, double h) -> w * h;
+                      case Circle c -> Math.PI * c.r() * c.r();
+                  };
+              }
+
+              public static void main(String[] args) {
+                  for (Shape s : List.of(new Square(2), new Rect(2, 3), new Circle(1))) {
+                      System.out.println(s + " " + Math.round(area(s) * 100) / 100.0);
+                  }
+              }
+          }
+        expected: |
+          Square[side=2.0] 4.0
+          Rect[w=2.0, h=3.0] 6.0
+          Circle[r=1.0] 3.14
+        explanation: Because Shape is sealed, a switch that covers Circle, Square and Rect is exhaustive without default; adding a fourth permitted record later makes the switch fail to compile instead of silently returning 0. Records give the toString shown, and Rect(double w, double h) is a record pattern that unpacks the components.
+        hint: Which permitted record has no case yet?
+
+  - id: java.generics
+    title: Generics and type erasure
+    summary: >
+      Type parameters (with bounds) give compile-time type safety. Generic
+      types are invariant; wildcards (? extends, ? super) add flexibility.
+      Type arguments are erased at runtime.
+    level: intermediate
+    prereqs: [java.classes]
+    lesson:
+      intro: Generics let the compiler check element types, but they exist only at compile time. Most surprises come from invariance and erasure.
+      example:
+        lang: java
+        code: |
+          static <T extends Comparable<T>> T max(List<T> xs) {
+              T best = xs.get(0);
+              for (T x : xs) if (x.compareTo(best) > 0) best = x;
+              return best;
+          }
+          static double sum(List<? extends Number> xs) {
+              double total = 0;
+              for (Number n : xs) total += n.doubleValue();
+              return total;
+          }
+          List<Integer> ints = List.of(3, 9, 4);
+          System.out.println(max(ints) + " " + sum(ints));
+          // List<Number> nums = ints;   // does not compile
+          System.out.println(new ArrayList<String>().getClass() == new ArrayList<Integer>().getClass());
+      steps:
+        - text: "<T extends Comparable<T>> declares a type parameter with a bound: T can be any type that compares to itself, so x.compareTo(best) compiles. For max(ints) the compiler infers T = Integer, and the line prints 9 16.0."
+        - text: Generic types are invariant. If a List<Integer> could be used as a List<Number>, code could call nums.add(2.5) and put a Double into a list of Integers.
+          predict:
+            prompt: Does List<Number> nums = ints; compile?
+            options:
+              - text: Yes, because Integer is a subtype of Number
+                explanation: Integer extends Number, but List<Integer> is not a subtype of List<Number>.
+              - text: No, generic types are invariant
+                correct: true
+        - text: "Wildcards restore flexibility. List<? extends Number> accepts a List<Integer> or List<Double>; you can read Numbers out but cannot add to it. List<? super Integer> is the opposite: you can add Integers. Remember PECS: Producer Extends, Consumer Super."
+        - text: Type arguments are erased when compiling. At runtime there is only one ArrayList class, so the last line prints true.
+          predict:
+            prompt: What does the last line print?
+            options:
+              - text: "false"
+                explanation: Erasure removes type arguments; both objects are plain ArrayList at runtime.
+              - text: "true"
+                correct: true
+        - text: "Erasure explains the rules: no new T(), no new T[n], no instanceof List<String>, and no primitive type arguments (List<int>), so you use List<Integer> and autoboxing."
+      takeaway: Bounds let you call methods on T; generics are invariant, so use ? extends to read and ? super to write; type arguments are gone at runtime.
+    items:
+      - id: java.generics.mcq-invariance
+        type: mcq
+        prompt: Why does javac reject List<Number> nums = new ArrayList<Integer>();?
+        options:
+          - text: Otherwise nums.add(2.5) would put a Double into a list that must hold only Integers
+            correct: true
+            explanation: Invariance keeps writes type-safe. Use List<? extends Number> when you only need to read.
+          - text: Integer is not a subclass of Number
+            misconception: integer-not-number
+            explanation: Integer does extend Number; the problem is the List types, not the element types.
+          - text: It does not; generic types are covariant like arrays
+            misconception: generics-covariant
+            explanation: Arrays are covariant (Number[] n = new Integer[1] compiles and fails at runtime with ArrayStoreException); generics chose compile-time safety instead.
+        explanation: A subtype relation between element types does not carry over to the generic types.
+        hint: Imagine the assignment were allowed. What could you add next?
+
+      - id: java.generics.output-raw-type
+        type: output
+        prompt: What happens when this runs?
+        code: |
+          List<String> names = new ArrayList<>();
+          List raw = names;
+          raw.add(42);
+          System.out.println(names.size());
+          String first = names.get(0);
+          System.out.println(first);
+        options:
+          - text: It prints 1, then throws a ClassCastException at names.get(0)
+            correct: true
+            explanation: The raw list accepts the Integer (with an unchecked warning). The compiler inserted a cast to String where the element is read, and that cast fails.
+          - text: It does not compile, because 42 is not a String
+            misconception: raw-types-checked
+            explanation: A raw List has no type argument to check; javac only emits an unchecked warning.
+          - text: It throws a ClassCastException at raw.add(42)
+            misconception: erasure-checks-at-runtime
+            explanation: After erasure the list has no idea it should hold Strings; it stores any Object.
+          - text: It prints 1, then 42
+            misconception: no-inserted-cast
+            explanation: Assigning to a String variable requires a cast, which the compiler added and which fails at runtime.
+        explanation: Raw types switch off generic checks and move the failure far from its cause (heap pollution). Never use them in new code.
+        hint: Erased generics still need casts when elements come out.
+
+      - id: java.generics.cloze-pecs
+        type: cloze
+        prompt: "fill must add Integers to a List<Integer>, List<Number> or List<Object>. Complete its parameter: static void fill(List<? ___ Integer> out) { out.add(1); }"
+        answers: ["super"]
+        case_sensitive: true
+        explanation: "? super Integer means \"some supertype of Integer\", so adding an Integer is always safe. ? extends would only allow reading."
+        hint: PECS — Producer Extends, Consumer Super.
+
+      - id: java.generics.bug-new-t
+        type: bug
+        prompt: javac rejects this class. Which line is the problem?
+        code: |
+          class Box<T> {
+              private final List<T> items = new ArrayList<>();
+              void add(T item) { items.add(item); }
+              T fresh() { return new T(); }
+              int size() { return items.size(); }
+          }
+        bug_line: 4
+        explanation: T is erased, so at runtime there is no class to instantiate. Pass a Supplier<T> (for example Box(Supplier<T> factory)) and call factory.get().
+        hint: What does T become after compilation?
+
+      - id: java.generics.code-wildcard-sum
+        type: code
+        language: java
+        prompt: sum must accept a List<Integer> and a List<Double>. Fix its parameter type; max is already correct.
+        starter: |
+          import java.util.List;
+
+          public class Main {
+              static double sum(List<Number> nums) {
+                  double total = 0;
+                  for (Number n : nums) total += n.doubleValue();
+                  return total;
+              }
+
+              static <T extends Comparable<T>> T max(List<T> items) {
+                  T best = items.get(0);
+                  for (T item : items) if (item.compareTo(best) > 0) best = item;
+                  return best;
+              }
+
+              public static void main(String[] args) {
+                  List<Integer> ints = List.of(3, 9, 4);
+                  List<Double> doubles = List.of(1.5, 2.5);
+                  System.out.println(sum(ints) + " " + sum(doubles));
+                  System.out.println(max(ints) + " " + max(List.of("pear", "apple", "plum")));
+              }
+          }
+        solution: |
+          import java.util.List;
+
+          public class Main {
+              static double sum(List<? extends Number> nums) {
+                  double total = 0;
+                  for (Number n : nums) total += n.doubleValue();
+                  return total;
+              }
+
+              static <T extends Comparable<T>> T max(List<T> items) {
+                  T best = items.get(0);
+                  for (T item : items) if (item.compareTo(best) > 0) best = item;
+                  return best;
+              }
+
+              public static void main(String[] args) {
+                  List<Integer> ints = List.of(3, 9, 4);
+                  List<Double> doubles = List.of(1.5, 2.5);
+                  System.out.println(sum(ints) + " " + sum(doubles));
+                  System.out.println(max(ints) + " " + max(List.of("pear", "apple", "plum")));
+              }
+          }
+        expected: |
+          16.0 4.0
+          9 plum
+        explanation: Generics are invariant, so a List<Integer> is not a List<Number> (otherwise sum could add a Double to it). List<? extends Number> accepts a list of any Number subtype for reading. The bound T extends Comparable<T> is what lets max call compareTo.
+        hint: Which wildcard means "a list of some subtype of Number"?
+
+  - id: java.collections
+    title: Collections — List, Set and Map
+    summary: >
+      ArrayList, HashSet and HashMap are the defaults; TreeMap sorts and
+      LinkedHashMap keeps insertion order. List.of is unmodifiable,
+      remove(int) is not remove(Object), and structural changes during a
+      for-each loop fail fast.
+    level: intermediate
+    prereqs: [java.generics, logic.hashing]
+    lesson:
+      intro: The collection interfaces are simple, but a few overloads and factory methods behave differently from what their names suggest.
+      example:
+        lang: java
+        code: |
+          List<Integer> xs = new ArrayList<>(List.of(10, 20, 30));
+          xs.remove(1);
+          xs.remove(Integer.valueOf(10));
+          System.out.println(xs);
+          List<String> fixed = List.of("a", "b");
+          // fixed.add("c");  // UnsupportedOperationException
+          Map<String, Integer> counts = new HashMap<>();
+          for (String w : "to be or not to be".split(" "))
+              counts.merge(w, 1, Integer::sum);
+          System.out.println(new TreeMap<>(counts));
+          Set<String> seen = new LinkedHashSet<>(List.of("b", "a", "b"));
+          System.out.println(seen);
+      steps:
+        - text: "List<Integer> has two remove methods. remove(1) is remove(int index) and drops 20; remove(Integer.valueOf(10)) is remove(Object) and drops the value 10. The list prints [30]."
+          predict:
+            prompt: What does xs.remove(1) remove from [10, 20, 30]?
+            options:
+              - text: "20, the element at index 1"
+                correct: true
+              - text: The value 1, which is not in the list, so nothing
+                explanation: An int argument picks remove(int index); you need Integer.valueOf(1) to remove by value.
+        - text: List.of, Set.of and Map.of return unmodifiable collections (and reject null elements). Adding throws UnsupportedOperationException. Wrap one in new ArrayList<>(...) to get a mutable copy.
+        - text: "merge(key, 1, Integer::sum) inserts 1 for a new key or combines the old value with 1. HashMap has no defined order, so copying into a TreeMap sorts the keys: {be=2, not=1, or=1, to=2}."
+          predict:
+            prompt: In which order would printing counts (the HashMap) list its keys?
+            options:
+              - text: Insertion order, to be or not
+                explanation: That is LinkedHashMap. HashMap's order depends on hashes and capacity and is not guaranteed.
+              - text: No guaranteed order
+                correct: true
+              - text: Alphabetical order
+                explanation: That is TreeMap, which keeps keys sorted.
+        - text: LinkedHashSet drops duplicates but keeps the first-insertion order, so seen prints [b, a].
+        - text: "Pick by operation cost: ArrayList get(i) is O(1) but contains is O(n); HashSet/HashMap contains and get are O(1) on average; TreeMap/TreeSet are O(log n) and sorted."
+      takeaway: Know which remove you are calling, treat List.of as read-only, and pick HashMap, LinkedHashMap or TreeMap by the order you need.
+    items:
+      - id: java.collections.output-remove-overload
+        type: output
+        prompt: What does this print?
+        code: |
+          List<Integer> xs = new ArrayList<>(List.of(2, 0, 1));
+          xs.remove(0);
+          xs.remove(Integer.valueOf(0));
+          System.out.println(xs);
+        answers: ["[1]"]
+        explanation: remove(0) removes the element at index 0 (the 2), giving [0, 1]. remove(Integer.valueOf(0)) removes the value 0, leaving [1].
+        hint: An int argument means an index; an Integer argument means a value.
+
+      - id: java.collections.bug-concurrent-modification
+        type: bug
+        prompt: This throws ConcurrentModificationException. Which line causes it?
+        code: |
+          List<String> names = new ArrayList<>(List.of("bo", "ana", "cy"));
+          for (String n : names) {
+              if (n.length() < 3) {
+                  names.remove(n);
+              }
+          }
+          System.out.println(names);
+        bug_line: 4
+        explanation: The for-each loop iterates with an Iterator; removing through the list behind its back makes the next iterator.next() fail fast. Use names.removeIf(n -> n.length() < 3) or iterator.remove().
+        hint: Who is allowed to change a list while it is being iterated?
+
+      - id: java.collections.mcq-seen-ids
+        type: mcq
+        prompt: A loop checks millions of times whether an id was already seen. Which collection gives O(1) average-time lookups?
+        options:
+          - text: HashSet<Long>
+            correct: true
+            explanation: contains hashes the id and checks one bucket, O(1) on average.
+          - text: ArrayList<Long>
+            misconception: list-contains-constant
+            explanation: ArrayList.contains scans the elements one by one, O(n).
+          - text: TreeSet<Long>
+            misconception: tree-set-constant
+            explanation: TreeSet keeps elements sorted in a red-black tree; contains is O(log n).
+        explanation: Use a TreeSet only when you also need sorted order or range queries.
+        hint: Which structure jumps straight to a bucket by hash?
+
+      - id: java.collections.output-unmodifiable
+        type: output
+        prompt: What does this print?
+        code: |
+          List<String> a = List.of("x");
+          List<String> b = Arrays.asList("y");
+          b.set(0, "z");
+          try {
+              a.set(0, "w");
+          } catch (UnsupportedOperationException e) {
+              System.out.print("UOE ");
+          }
+          System.out.println(b);
+        options:
+          - text: "UOE [z]"
+            correct: true
+            explanation: Arrays.asList is a fixed-size view of an array, so set works (add and remove do not). List.of is fully unmodifiable, so even set throws.
+          - text: "[z]"
+            misconception: list-of-mutable
+            explanation: List.of returns an unmodifiable list; every mutator throws UnsupportedOperationException.
+          - text: An UnsupportedOperationException escapes from b.set(0, "z")
+            misconception: aslist-immutable
+            explanation: Arrays.asList allows set; only changes to its size are refused.
+        explanation: Know the three flavors — mutable ArrayList, fixed-size Arrays.asList and unmodifiable List.of.
+        hint: Arrays.asList is backed by an array. What can an array not do?
+
+      - id: java.collections.code-remove-while-iterating
+        type: code
+        language: java
+        prompt: Remove the even numbers from the list. The for-each loop crashes; replace it.
+        starter: |
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.Map;
+          import java.util.TreeMap;
+
+          public class Main {
+              public static void main(String[] args) {
+                  List<Integer> nums = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6));
+                  for (Integer n : nums) {
+                      if (n % 2 == 0) nums.remove(n);
+                  }
+                  System.out.println(nums);
+
+                  Map<String, Integer> counts = new TreeMap<>();
+                  for (String w : "b a b c a b".split(" ")) counts.merge(w, 1, Integer::sum);
+                  System.out.println(counts);
+              }
+          }
+        solution: |
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.Map;
+          import java.util.TreeMap;
+
+          public class Main {
+              public static void main(String[] args) {
+                  List<Integer> nums = new ArrayList<>(List.of(1, 2, 3, 4, 5, 6));
+                  nums.removeIf(n -> n % 2 == 0);
+                  System.out.println(nums);
+
+                  Map<String, Integer> counts = new TreeMap<>();
+                  for (String w : "b a b c a b".split(" ")) counts.merge(w, 1, Integer::sum);
+                  System.out.println(counts);
+              }
+          }
+        expected: |
+          [1, 3, 5]
+          {a=2, b=3, c=1}
+        explanation: Changing an ArrayList while a for-each loop iterates it makes the iterator throw ConcurrentModificationException on its next step. removeIf (or an explicit Iterator and its remove()) is the safe way. The TreeMap keeps keys sorted, and merge adds 1 to an existing count or stores 1.
+        hint: Collection has a method that removes every element matching a predicate.
+
+  - id: java.equals-hashcode
+    title: equals and hashCode
+    summary: >
+      Object.equals compares identity. Value classes override equals and
+      hashCode together: equal objects must have equal hash codes, or hash
+      collections stop finding them. Mutating a key inside a HashSet loses it.
+    level: intermediate
+    prereqs: [java.collections]
+    lesson:
+      intro: HashSet and HashMap use two methods to find an element. hashCode picks the bucket, then equals checks the candidates in it. Get either wrong and lookups quietly fail.
+      example:
+        lang: java
+        code: |
+          class Point {
+              final int x, y;
+              Point(int x, int y) { this.x = x; this.y = y; }
+              @Override public boolean equals(Object o) {
+                  return o instanceof Point p && p.x == x && p.y == y;
+              }
+              @Override public int hashCode() { return Objects.hash(x, y); }
+          }
+          var a = new Point(1, 2);
+          var b = new Point(1, 2);
+          System.out.println((a == b) + " " + a.equals(b));
+          Set<Point> set = new HashSet<>(List.of(a));
+          System.out.println(set.contains(b));
+      steps:
+        - text: The default equals inherited from Object is identity, the same as ==. Point overrides it to compare coordinates, so the first line prints false true.
+        - text: "o instanceof Point p checks the type and binds p in one step. It is false for null, so a.equals(null) is false as the contract requires. Note the parameter type is Object: equals(Point) would overload, not override."
+        - text: set.contains(b) computes b.hashCode(), goes to that bucket and calls equals on what it finds there. Both methods agree, so it prints true.
+          predict:
+            prompt: If hashCode() were deleted (equals kept), what would set.contains(b) almost certainly return?
+            options:
+              - text: "true, because equals says they are equal"
+                explanation: The set looks in the bucket of b's identity hash code, which differs from a's, so equals is never even called.
+              - text: "false"
+                correct: true
+        - text: "The contract: equal objects must have equal hash codes. Unequal objects may share a hash code (a collision), which only costs speed. Build both methods from the same fields; Objects.hash is a simple way."
+        - text: Never change a field used by hashCode while the object is a key in a HashMap or an element of a HashSet; it stays in its old bucket and can no longer be found. A record of final fields generates correct equals and hashCode for you.
+      takeaway: Override equals(Object) and hashCode together from the same fields, and keep hash keys immutable — or use a record.
+    items:
+      - id: java.equals-hashcode.output-missing-hashcode
+        type: output
+        prompt: What does this print in practice?
+        code: |
+          class Key {
+              final String id;
+              Key(String id) { this.id = id; }
+              @Override public boolean equals(Object o) {
+                  return o instanceof Key k && k.id.equals(id);
+              }
+          }
+          Set<Key> set = new HashSet<>();
+          set.add(new Key("a"));
+          set.add(new Key("a"));
+          System.out.println(set.size() + " " + new Key("a").equals(new Key("a")));
+        options:
+          - text: "2 true"
+            correct: true
+            explanation: equals says the keys are equal, but each object keeps Object's identity hash code, so they land in different buckets and HashSet never compares them.
+          - text: "1 true"
+            misconception: hashset-uses-only-equals
+            explanation: HashSet consults hashCode before equals; without a matching hashCode the duplicate is not detected.
+          - text: "2 false"
+            misconception: equals-not-overridden
+            explanation: equals is overridden correctly and returns true; the broken part is the missing hashCode.
+        explanation: Overriding equals without hashCode breaks every hash-based collection.
+        hint: Which method does HashSet call first?
+
+      - id: java.equals-hashcode.bug-equals-overload
+        type: bug
+        prompt: List.of(new Point(1, 2)).contains(new Point(1, 2)) returns false. Which line is the cause?
+        code: |
+          class Point {
+              final int x, y;
+              Point(int x, int y) { this.x = x; this.y = y; }
+              public boolean equals(Point other) {
+                  return x == other.x && y == other.y;
+              }
+              @Override public int hashCode() { return 31 * x + y; }
+          }
+        bug_line: 4
+        explanation: equals(Point) is a new overload; collections call equals(Object), which is still Object's identity check. Declare equals(Object o) with @Override, and the compiler will catch the mistake.
+        hint: Which signature do collections call?
+
+      - id: java.equals-hashcode.multi-contract
+        type: multi
+        prompt: For a correct equals/hashCode pair, which statements must hold?
+        options:
+          - text: If a.equals(b) is true, then a.hashCode() == b.hashCode()
+            correct: true
+            explanation: This is the rule hash collections rely on.
+          - text: a.equals(a) is true
+            correct: true
+            explanation: equals must be reflexive (also symmetric, transitive and consistent).
+          - text: a.equals(null) is false
+            correct: true
+            explanation: Comparing with null must return false, never throw.
+          - text: If a.hashCode() == b.hashCode(), then a.equals(b) is true
+            misconception: hash-implies-equal
+            explanation: Different objects may collide on a hash code; equals makes the final decision.
+          - text: Every object must have a unique hashCode
+            misconception: hashcode-unique
+            explanation: Uniqueness is impossible with 2^32 values and not required; fewer collisions just means faster lookups.
+        explanation: Equal implies same hash; same hash does not imply equal.
+        hint: Hash codes can collide.
+
+      - id: java.equals-hashcode.output-mutated-key
+        type: output
+        prompt: What does this print?
+        code: |
+          List<Integer> key = new ArrayList<>(List.of(1));
+          Set<List<Integer>> set = new HashSet<>();
+          set.add(key);
+          key.add(2);
+          System.out.println(set.contains(key) + " " + set.size());
+        answers: ["false 1"]
+        explanation: The list was stored in the bucket for the hash of [1]. Adding 2 changed its hashCode, so contains looks in a different bucket. The element is still in the set, just unreachable by lookup.
+        hint: List.hashCode depends on the elements.
+
+      - id: java.equals-hashcode.code-hashset-point
+        type: code
+        language: java
+        prompt: Two points are equal when x and y match; the label is only a display name. The same position is added three times under different labels, but the HashSet keeps all three and cannot find it. Fix hashCode so it agrees with equals.
+        starter: |
+          import java.util.HashSet;
+          import java.util.Objects;
+          import java.util.Set;
+
+          public class Main {
+              static final class Point {
+                  final int x, y;
+                  final String label; // a display name, not part of the point's identity
+                  Point(int x, int y, String label) { this.x = x; this.y = y; this.label = label; }
+
+                  @Override public boolean equals(Object o) {
+                      return o instanceof Point p && p.x == x && p.y == y;
+                  }
+
+                  @Override public int hashCode() {
+                      return Objects.hash(x, y, label);
+                  }
+              }
+
+              public static void main(String[] args) {
+                  Set<Point> visited = new HashSet<>();
+                  visited.add(new Point(1, 2, "home"));
+                  visited.add(new Point(1, 2, "start"));
+                  visited.add(new Point(1, 2, "again"));
+                  System.out.println(visited.size());
+                  System.out.println(visited.contains(new Point(1, 2, "query")));
+              }
+          }
+        solution: |
+          import java.util.HashSet;
+          import java.util.Objects;
+          import java.util.Set;
+
+          public class Main {
+              static final class Point {
+                  final int x, y;
+                  final String label; // a display name, not part of the point's identity
+                  Point(int x, int y, String label) { this.x = x; this.y = y; this.label = label; }
+
+                  @Override public boolean equals(Object o) {
+                      return o instanceof Point p && p.x == x && p.y == y;
+                  }
+
+                  @Override public int hashCode() {
+                      return Objects.hash(x, y);
+                  }
+              }
+
+              public static void main(String[] args) {
+                  Set<Point> visited = new HashSet<>();
+                  visited.add(new Point(1, 2, "home"));
+                  visited.add(new Point(1, 2, "start"));
+                  visited.add(new Point(1, 2, "again"));
+                  System.out.println(visited.size());
+                  System.out.println(visited.contains(new Point(1, 2, "query")));
+              }
+          }
+        expected: |
+          1
+          true
+        explanation: "The contract says equal objects must have equal hash codes. HashSet compares hash codes first and calls equals only when they match, so a hashCode that mixes in label, a field equals ignores, gives the three equal points three different hash codes: the set keeps all of them, and contains with a fourth label finds none. Objects.hash(x, y) uses exactly the fields equals compares (a record derives both for you)."
+        hint: Which fields does equals compare, and which does hashCode use?
+
+  - id: java.exceptions
+    title: Exceptions and try-with-resources
+    summary: >
+      Checked exceptions must be caught or declared; unchecked ones
+      (RuntimeException and its subclasses) need not. finally always runs, and
+      try-with-resources closes resources in reverse order.
+    level: intermediate
+    prereqs: [java.classes]
+    lesson:
+      intro: An exception unwinds the call stack until a matching catch is found, and finally blocks run on the way out, even after a return.
+      example:
+        lang: java
+        code: |
+          static int parse(String s) {
+              try {
+                  return Integer.parseInt(s);
+              } catch (NumberFormatException e) {
+                  System.out.println("bad: " + s);
+                  return -1;
+              } finally {
+                  System.out.println("done " + s);
+              }
+          }
+          System.out.println(parse("42"));
+          System.out.println(parse("x"));
+      steps:
+        - text: parse("42") returns 42 from the try block, but finally runs before the caller gets the value. So done 42 prints before 42.
+          predict:
+            prompt: What are the first two lines of output?
+            options:
+              - text: "42, then done 42"
+                explanation: The finally block runs before the method actually returns to the caller.
+              - text: "done 42, then 42"
+                correct: true
+        - text: 'parseInt("x") throws NumberFormatException; the catch prints "bad: x" and returns -1, and finally still runs. The output continues with bad: x, done x, -1.'
+        - text: NumberFormatException is unchecked (a RuntimeException), so parse need not declare it. Checked exceptions such as IOException must be caught or declared with throws, or the code does not compile.
+          predict:
+            prompt: Which one must be caught or declared?
+            options:
+              - text: IllegalArgumentException
+                explanation: It extends RuntimeException, so it is unchecked.
+              - text: IOException
+                correct: true
+              - text: NullPointerException
+                explanation: It extends RuntimeException, so it is unchecked.
+        - text: "try (var in = Files.newBufferedReader(path)) { ... } closes in automatically, in reverse order of opening, even when the body throws. An exception from close() is attached to the main one as suppressed."
+        - text: Catch the most specific exceptions first and never return from a finally block, because that return replaces the try's result and discards any exception in flight.
+      takeaway: finally always runs; checked exceptions are part of the signature; use try-with-resources for anything that must be closed.
+    items:
+      - id: java.exceptions.output-try-with-resources
+        type: output
+        prompt: What does this print?
+        code: |
+          class Res implements AutoCloseable {
+              final String name;
+              Res(String name) { this.name = name; System.out.println("open " + name); }
+              public void close() { System.out.println("close " + name); }
+          }
+          try (var a = new Res("a"); var b = new Res("b")) {
+              System.out.println("body");
+          }
+        answers: ["open a\nopen b\nbody\nclose b\nclose a"]
+        explanation: Resources open left to right and close in reverse order, after the body and before any catch or finally.
+        hint: "Like a stack: last opened, first closed."
+
+      - id: java.exceptions.output-finally-return
+        type: output
+        prompt: What does this print?
+        code: |
+          static int f() {
+              try {
+                  return 1;
+              } finally {
+                  return 2;
+              }
+          }
+          System.out.println(f());
+        options:
+          - text: "2"
+            correct: true
+            explanation: The return in finally replaces the pending return 1. It would also swallow an exception thrown in the try.
+          - text: "1"
+            misconception: try-return-is-final
+            explanation: finally runs after return 1 is evaluated but before the method exits, and its own return wins.
+          - text: It does not compile
+            misconception: finally-return-illegal
+            explanation: It compiles (javac -Xlint warns that finally does not complete normally). It is legal, just a bad idea.
+        explanation: Never return or throw from finally; use it only for cleanup.
+        hint: Which block runs last?
+
+      - id: java.exceptions.mcq-checked
+        type: mcq
+        prompt: A method calls Files.readString(path), which declares throws IOException. What must the method do?
+        options:
+          - text: Catch IOException or declare throws IOException
+            correct: true
+            explanation: IOException is checked, so the compiler forces callers to handle or propagate it.
+          - text: Nothing; any exception may propagate freely
+            misconception: all-exceptions-unchecked
+            explanation: That is true only for RuntimeException and Error subclasses; checked exceptions are enforced by javac.
+          - text: Wrap the call in try/finally
+            misconception: finally-handles-exceptions
+            explanation: finally runs cleanup but does not handle the exception; the method still has to catch or declare it.
+        explanation: Checked exceptions are part of a method's signature.
+        hint: Does IOException extend RuntimeException?
+
+      - id: java.exceptions.bug-catch-order
+        type: bug
+        prompt: javac rejects this method. Which line does it report?
+        code: |
+          static String readConfig() {
+              try {
+                  return Files.readString(Path.of("app.conf"));
+              } catch (IOException e) {
+                  return "";
+              } catch (FileNotFoundException e) {
+                  return "missing";
+              }
+          }
+        bug_line: 6
+        explanation: FileNotFoundException is a subclass of IOException, so the earlier catch already handles it and the second catch is unreachable. Catch the subclass first.
+        hint: Which exception is more specific?
+
+      - id: java.exceptions.code-try-with-resources
+        type: code
+        language: java
+        prompt: When use() throws, a and b are never closed. Rewrite work() with try-with-resources so both close, in reverse order, even on failure.
+        starter: |
+          public class Main {
+              static class Res implements AutoCloseable {
+                  private final String name;
+                  Res(String name) { this.name = name; System.out.println("open " + name); }
+                  void use(boolean fail) {
+                      if (fail) throw new IllegalStateException(name + " failed");
+                      System.out.println("use " + name);
+                  }
+                  @Override public void close() { System.out.println("close " + name); }
+              }
+
+              static void work(boolean fail) {
+                  Res a = new Res("a");
+                  Res b = new Res("b");
+                  b.use(fail);
+                  b.close();
+                  a.close();
+              }
+
+              public static void main(String[] args) {
+                  work(false);
+                  try {
+                      work(true);
+                  } catch (IllegalStateException e) {
+                      System.out.println("caught " + e.getMessage());
+                  }
+              }
+          }
+        solution: |
+          public class Main {
+              static class Res implements AutoCloseable {
+                  private final String name;
+                  Res(String name) { this.name = name; System.out.println("open " + name); }
+                  void use(boolean fail) {
+                      if (fail) throw new IllegalStateException(name + " failed");
+                      System.out.println("use " + name);
+                  }
+                  @Override public void close() { System.out.println("close " + name); }
+              }
+
+              static void work(boolean fail) {
+                  try (Res a = new Res("a"); Res b = new Res("b")) {
+                      b.use(fail);
+                  }
+              }
+
+              public static void main(String[] args) {
+                  work(false);
+                  try {
+                      work(true);
+                  } catch (IllegalStateException e) {
+                      System.out.println("caught " + e.getMessage());
+                  }
+              }
+          }
+        expected: |
+          open a
+          open b
+          use b
+          close b
+          close a
+          open a
+          open b
+          close b
+          close a
+          caught b failed
+        explanation: try-with-resources calls close() on every resource it opened when the block ends, normally or by an exception, in reverse order of opening, and before any outer catch runs. Without it, the exception skips the close() calls.
+        hint: "try (Res a = ...; Res b = ...) { ... }"
+
+  - id: java.lambdas-streams
+    title: Lambdas and streams
+    summary: >
+      Lambdas and method references implement functional interfaces. Streams
+      are lazy pipelines: nothing runs until a terminal operation, elements
+      flow one at a time, and a stream can be consumed only once.
+    level: intermediate
+    prereqs: [java.collections]
+    lesson:
+      intro: A stream describes a pipeline over data. Intermediate operations such as filter and map only add stages; a terminal operation such as collect, count or findFirst runs it.
+      example:
+        lang: java
+        code: |
+          List<String> words = List.of("kiwi", "apple", "fig", "banana", "avocado");
+          Map<Integer, List<String>> byLen = words.stream()
+              .filter(w -> w.length() > 3)
+              .collect(Collectors.groupingBy(String::length, TreeMap::new, Collectors.toList()));
+          System.out.println(byLen);
+          Stream<String> s = words.stream().filter(w -> {
+              System.out.println("check " + w);
+              return w.startsWith("a");
+          });
+          System.out.println("built");
+          System.out.println(s.findFirst().get());
+          int limit = 4;
+          System.out.println(words.stream().filter(w -> w.length() == limit).count());
+      steps:
+        - text: "w -> w.length() > 3 is a lambda implementing Predicate<String>, an interface with one abstract method. String::length is a method reference, short for w -> w.length()."
+        - text: "groupingBy(String::length, TreeMap::new, toList()) groups words by length into a TreeMap, so byLen prints {4=[kiwi], 5=[apple], 6=[banana], 7=[avocado]}."
+        - text: Building s runs nothing; intermediate operations are lazy. built prints first, and the filter only runs when findFirst asks for elements.
+          predict:
+            prompt: What prints right after byLen?
+            options:
+              - text: check kiwi
+                explanation: filter only records the stage; no element is checked until a terminal operation runs.
+              - text: built
+                correct: true
+        - text: Elements go through the whole pipeline one at a time, and findFirst stops at the first match. Only kiwi and apple are checked, then apple prints.
+          predict:
+            prompt: How many check lines are printed?
+            options:
+              - text: "5"
+                explanation: findFirst is short-circuiting; it stops pulling elements once apple passes.
+              - text: "2"
+                correct: true
+              - text: "3"
+                explanation: The words starting with a are apple and avocado, but the stream stops at the first one.
+        - text: A lambda can use a local variable only if it is effectively final; adding limit++ anywhere would make the last lambda fail to compile. A stream is single-use, so calling a second terminal operation on s throws IllegalStateException.
+      takeaway: Intermediate operations are lazy, terminal operations run the pipeline one element at a time, lambdas capture only effectively final locals, and a stream is used once.
+    items:
+      - id: java.lambdas-streams.output-laziness
+        type: output
+        prompt: What does this print?
+        code: |
+          List<Integer> seen = new ArrayList<>();
+          Stream<Integer> s = Stream.of(1, 2, 3, 4).map(n -> { seen.add(n); return n * 10; });
+          System.out.println(seen.size());
+          System.out.println(s.filter(n -> n > 15).findFirst().get());
+          System.out.println(seen);
+        answers: ["0\n20\n[1, 2]"]
+        explanation: map is lazy, so seen is empty before the terminal operation. findFirst pulls 1 (10 fails the filter) and 2 (20 passes) and stops, so 3 and 4 are never mapped.
+        hint: When does map actually run, and when does findFirst stop?
+
+      - id: java.lambdas-streams.output-reuse
+        type: output
+        prompt: What happens when this runs?
+        code: |
+          Stream<String> s = Stream.of("a", "b");
+          System.out.println(s.count());
+          System.out.println(s.count());
+        options:
+          - text: It prints 2, then throws IllegalStateException
+            correct: true
+            explanation: A terminal operation consumes the stream; any later operation fails with "stream has already been operated upon or closed".
+          - text: It prints 2 twice
+            misconception: stream-reusable
+            explanation: A stream is not a collection; it cannot be traversed twice. Create a new one from the source.
+          - text: It prints 2, then 0
+            misconception: stream-exhausted-empty
+            explanation: A used stream is not empty, it is unusable, and Java reports that with an exception.
+        explanation: Keep the source (a List or a Supplier<Stream<T>>) when you need several passes.
+        hint: Is a Stream a container?
+
+      - id: java.lambdas-streams.bug-effectively-final
+        type: bug
+        prompt: javac rejects this code. Which line does it report?
+        code: |
+          int total = 0;
+          List<Integer> xs = List.of(1, 2, 3);
+          xs.forEach(x -> total += x);
+          System.out.println(total);
+        bug_line: 3
+        explanation: Lambdas may only use local variables that are effectively final, and total is assigned inside the lambda. Compute the value instead with xs.stream().mapToInt(Integer::intValue).sum().
+        hint: What may a lambda do with a captured local variable?
+
+      - id: java.lambdas-streams.parsons-pipeline
+        type: parsons
+        prompt: "Order the lines: the names of adult users (record User(String name, int age)), sorted, joined with commas."
+        lines:
+          - "String result = users.stream()"
+          - "    .filter(u -> u.age() >= 18)"
+          - "    .map(User::name)"
+          - "    .sorted()"
+          - "    .collect(Collectors.joining(\", \"));"
+        explanation: Filter while you still have User objects, map to the names, sort the Strings (User is not Comparable), and finish with the terminal collect.
+        hint: After map, the elements are Strings and no longer have an age.
+
+      - id: java.lambdas-streams.code-filter-sort
+        type: code
+        language: java
+        prompt: Print the names of the people aged 30 or more, uppercased and sorted, then the sum of all ages. Extend the first pipeline.
+        starter: |
+          import java.util.List;
+          import java.util.stream.Collectors;
+
+          public class Main {
+              record Person(String name, int age) {}
+
+              public static void main(String[] args) {
+                  List<Person> people = List.of(new Person("cy", 41), new Person("ana", 35), new Person("bo", 19));
+                  String names = people.stream()
+                          .map(Person::name)
+                          .collect(Collectors.joining(", "));
+                  System.out.println(names);
+                  System.out.println(people.stream().mapToInt(Person::age).sum());
+              }
+          }
+        solution: |
+          import java.util.List;
+          import java.util.stream.Collectors;
+
+          public class Main {
+              record Person(String name, int age) {}
+
+              public static void main(String[] args) {
+                  List<Person> people = List.of(new Person("cy", 41), new Person("ana", 35), new Person("bo", 19));
+                  String names = people.stream()
+                          .filter(p -> p.age() >= 30)
+                          .map(Person::name)
+                          .map(String::toUpperCase)
+                          .sorted()
+                          .collect(Collectors.joining(", "));
+                  System.out.println(names);
+                  System.out.println(people.stream().mapToInt(Person::age).sum());
+              }
+          }
+        expected: |
+          ANA, CY
+          95
+        explanation: A stream is a lazy pipeline that runs once, when the terminal operation (collect, sum) asks for elements. filter keeps matching elements, map transforms them (Person::name and String::toUpperCase are method references), sorted orders them, and joining builds the string. mapToInt gives an IntStream with sum.
+        hint: filter, map, sorted — all before collect.
+
+  - id: java.optional
+    title: Optional
+    summary: >
+      Optional<T> is a return type that says "maybe no value". Transform it
+      with map, flatMap and filter, and unwrap it with orElse, orElseGet or
+      orElseThrow. orElse evaluates its argument eagerly.
+    level: intermediate
+    prereqs: [java.lambdas-streams]
+    lesson:
+      intro: Returning null forces every caller to remember a check. Returning Optional puts "may be empty" into the type and offers methods to handle both cases.
+      example:
+        lang: java
+        code: |
+          static Optional<String> findEmail(String user) {
+              return user.equals("ana") ? Optional.of("ana@x.io") : Optional.empty();
+          }
+          static String fallback() { System.out.println("fallback called"); return "none"; }
+          System.out.println(findEmail("ana").map(String::toUpperCase).orElse("none"));
+          System.out.println(findEmail("bob").isPresent());
+          System.out.println(findEmail("ana").orElse(fallback()));
+          System.out.println(findEmail("ana").orElseGet(() -> fallback()));
+      steps:
+        - text: findEmail returns Optional.of(value) or Optional.empty(). map transforms the value when it exists, so the first line prints ANA@X.IO; on an empty Optional map does nothing and orElse supplies none.
+        - text: isPresent reports whether a value is there; bob has none, so it prints false. get() on an empty Optional throws NoSuchElementException, so prefer orElse, orElseGet or orElseThrow.
+        - text: orElse(fallback()) is an ordinary method call, so its argument is evaluated first, every time. fallback called prints even though ana has an email, then ana@x.io.
+          predict:
+            prompt: Does fallback called print for the orElse(fallback()) line?
+            options:
+              - text: Yes
+                correct: true
+              - text: No, because the Optional has a value
+                explanation: Java evaluates method arguments before the call; orElse receives a value that was already computed.
+        - text: orElseGet takes a Supplier and calls it only when the Optional is empty, so the last line prints just ana@x.io. Use it when the fallback is expensive or has side effects.
+          predict:
+            prompt: Does fallback called print for the orElseGet line?
+            options:
+              - text: No
+                correct: true
+              - text: Yes
+                explanation: The lambda is only invoked when the Optional is empty.
+        - text: Optional.of(null) throws NullPointerException; use Optional.ofNullable for values that may be null. Use Optional for return values, not for fields, parameters or collections.
+      takeaway: Return Optional instead of null, chain map/filter, and prefer orElseGet when the fallback costs something.
+    items:
+      - id: java.optional.output-orelse-eager
+        type: output
+        prompt: What does this print?
+        code: |
+          static String load() {
+              System.out.println("load");
+              return "default";
+          }
+          String v = Optional.of("cached").orElse(load());
+          System.out.println(v);
+        answers: ["load\ncached"]
+        explanation: load() is an argument, so it runs before orElse is called. orElse then returns the present value, cached. orElseGet(() -> load()) would skip the call.
+        hint: When are method arguments evaluated?
+
+      - id: java.optional.mcq-of-null
+        type: mcq
+        prompt: What does Optional.of(null) do?
+        options:
+          - text: Throws NullPointerException
+            correct: true
+            explanation: of requires a non-null value. Use Optional.ofNullable(x) when x may be null.
+          - text: Returns Optional.empty()
+            misconception: optional-of-accepts-null
+            explanation: That is ofNullable(null); of rejects null immediately.
+          - text: Returns an Optional that holds null
+            misconception: optional-holds-null
+            explanation: An Optional never contains null; it is either a value or empty.
+        explanation: Choose of when null would be a bug, ofNullable when null means "absent".
+        hint: There are two factory methods for a reason.
+
+      - id: java.optional.output-map-filter
+        type: output
+        prompt: What does this print?
+        code: |
+          Optional<String> name = Optional.of("   ");
+          System.out.println(name.map(String::strip).filter(s -> !s.isEmpty()).orElse("anonymous"));
+        options:
+          - text: anonymous
+            correct: true
+            explanation: strip turns the blanks into "", filter rejects the empty string and returns an empty Optional, so orElse supplies anonymous.
+          - text: "(an empty line)"
+            misconception: filter-keeps-value
+            explanation: filter keeps the value only if the predicate is true; !"".isEmpty() is false.
+          - text: "(three spaces)"
+            misconception: optional-map-mutates
+            explanation: map returns a new Optional with the stripped value, and the chain continues from that one.
+        explanation: map, filter and flatMap chain on Optional like on a stream of at most one element.
+        hint: What does filter return when the predicate is false?
+
+      - id: java.optional.cloze-of-nullable
+        type: cloze
+        prompt: "map.get(key) returns null for a missing key. Wrap it safely: Optional<String> v = Optional.___(map.get(key));"
+        answers: ["ofNullable"]
+        case_sensitive: true
+        explanation: ofNullable returns Optional.empty() for null and Optional.of(value) otherwise.
+        hint: The factory method that accepts null.
+
+      - id: java.optional.code-map-orelse
+        type: code
+        language: java
+        prompt: Bo has no email, and get() crashes. Print each user's email domain, or none, without get().
+        starter: |
+          import java.util.List;
+          import java.util.Map;
+          import java.util.Optional;
+
+          public class Main {
+              static final Map<String, String> EMAILS = Map.of("ana", "ana@x.com");
+
+              static Optional<String> findEmail(String user) {
+                  return Optional.ofNullable(EMAILS.get(user));
+              }
+
+              public static void main(String[] args) {
+                  for (String user : List.of("ana", "bo")) {
+                      String domain = findEmail(user).get().split("@")[1];
+                      System.out.println(user + " " + domain);
+                  }
+              }
+          }
+        solution: |
+          import java.util.List;
+          import java.util.Map;
+          import java.util.Optional;
+
+          public class Main {
+              static final Map<String, String> EMAILS = Map.of("ana", "ana@x.com");
+
+              static Optional<String> findEmail(String user) {
+                  return Optional.ofNullable(EMAILS.get(user));
+              }
+
+              public static void main(String[] args) {
+                  for (String user : List.of("ana", "bo")) {
+                      String domain = findEmail(user)
+                              .map(email -> email.split("@")[1])
+                              .orElse("none");
+                      System.out.println(user + " " + domain);
+                  }
+              }
+          }
+        expected: |
+          ana x.com
+          bo none
+        explanation: get() on an empty Optional throws NoSuchElementException, which is no better than a NullPointerException. map transforms the value only when it is present and stays empty otherwise; orElse supplies the fallback at the end.
+        hint: Transform inside the Optional, then unwrap with a default.
+
+  - id: java.concurrency
+    title: Threads, atomics and virtual threads
+    summary: >
+      Threads share the heap, so unsynchronized read-modify-write such as
+      count++ loses updates. Use atomics, locks or thread-safe collections.
+      Java 21 virtual threads make one thread per blocking task cheap.
+    level: advanced
+    prereqs: [java.lambdas-streams, java.exceptions]
+    lesson:
+      intro: Concurrency bugs come from shared mutable state. Java 21 also makes it cheap to give every blocking task its own thread.
+      example:
+        lang: java
+        code: |
+          var counter = new AtomicInteger();
+          try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+              for (int i = 0; i < 10_000; i++) {
+                  pool.submit(() -> {
+                      Thread.sleep(10);
+                      return counter.incrementAndGet();
+                  });
+              }
+          }
+          System.out.println(counter.get());
+      steps:
+        - text: "Threads share the heap: all 10 000 tasks see the same counter object."
+        - text: count++ on a plain int is three steps (read, add, write). Two threads can read the same value, and one of the increments is lost.
+          predict:
+            prompt: With a plain int and count++ instead of the AtomicInteger, would the result always be 10000?
+            options:
+              - text: Yes, each task increments once
+                explanation: count++ is not atomic; two threads can read the same old value and both write the same new one.
+              - text: No, updates can be lost
+                correct: true
+        - text: AtomicInteger.incrementAndGet performs the read-modify-write atomically (compare-and-set). A synchronized block or a ReentrantLock also works; LongAdder scales better under heavy contention.
+        - text: newVirtualThreadPerTaskExecutor (Java 21) starts a new virtual thread for every task. A blocked virtual thread (sleep, I/O) releases its carrier OS thread, so 10 000 sleeping tasks overlap and the whole loop takes a fraction of a second.
+          predict:
+            prompt: Roughly how long does the try block take?
+            options:
+              - text: About 100 seconds, 10 000 × 10 ms
+                explanation: The tasks run concurrently, so their sleeps overlap instead of adding up.
+              - text: Well under a second
+                correct: true
+        - text: Since Java 19 ExecutorService is AutoCloseable, and close() waits for the submitted tasks, so the program prints 10000. Virtual threads help blocking I/O, not CPU-bound work, and should not be pooled.
+      takeaway: Shared mutable state needs atomics, locks or concurrent collections; use virtual threads for many blocking tasks, not to speed up computation.
+    items:
+      - id: java.concurrency.mcq-count-plus-plus
+        type: mcq
+        prompt: Two threads each run count++ 1000 times on a shared int field with no synchronization. Why can the final value be less than 2000?
+        options:
+          - text: count++ is a separate read, add and write, so concurrent increments can overwrite each other
+            correct: true
+            explanation: Both threads may read 41 and both write 42; one increment is lost. AtomicInteger or synchronized fixes it.
+          - text: The JVM runs only one thread at a time, so some increments are skipped
+            misconception: jvm-single-core
+            explanation: Threads run in parallel on several cores; the issue is interleaving, not skipping.
+          - text: Integer overflow
+            misconception: race-is-overflow
+            explanation: 2000 is far from Integer.MAX_VALUE; the lost updates come from the race.
+          - text: It cannot; ++ on an int is atomic in Java
+            misconception: increment-atomic
+            explanation: Only reads and writes of an int are atomic individually; the combined read-modify-write is not.
+        explanation: Any read-modify-write on shared state needs atomicity, not just visibility (volatile alone is not enough).
+        hint: How many memory operations does count++ perform?
+
+      - id: java.concurrency.multi-virtual-threads
+        type: multi
+        prompt: Which statements about Java 21 virtual threads are true?
+        options:
+          - text: They are cheap enough to create one per task, even millions
+            correct: true
+            explanation: They are managed by the JVM and use little memory until they run.
+          - text: They suit tasks that spend most of their time blocked on I/O
+            correct: true
+            explanation: A blocked virtual thread unmounts from its carrier, so the OS thread serves other virtual threads.
+          - text: Thread.ofVirtual().start(task) starts one
+            correct: true
+            explanation: Executors.newVirtualThreadPerTaskExecutor() and Thread.startVirtualThread(task) work too.
+          - text: They make CPU-bound computations faster
+            misconception: virtual-threads-faster-cpu
+            explanation: CPU work is still limited by the number of cores; virtual threads improve throughput for waiting, not raw speed.
+          - text: They should be reused through a fixed-size pool
+            misconception: pool-virtual-threads
+            explanation: Pooling exists because platform threads are expensive. Virtual threads are cheap; create a new one per task and limit concurrency with a Semaphore if needed.
+        explanation: Virtual threads are a cheap thread-per-request model for blocking code.
+        hint: What are virtual threads cheaper than, and what does that not change?
+
+      - id: java.concurrency.bug-shared-arraylist
+        type: bug
+        prompt: This sometimes prints less than 1000 or throws. Which line is the root cause?
+        code: |
+          List<Integer> squares = new ArrayList<>();
+          try (var pool = Executors.newFixedThreadPool(4)) {
+              for (int i = 0; i < 1000; i++) {
+                  int n = i;
+                  pool.submit(() -> squares.add(n * n));
+              }
+          }
+          System.out.println(squares.size());
+        bug_line: 1
+        explanation: ArrayList is not thread-safe; concurrent add calls corrupt its size and array. Use a thread-safe collection (Collections.synchronizedList, ConcurrentLinkedQueue) or, better, return the values from each task and collect the futures.
+        hint: Which object do all four threads modify?
+
+      - id: java.concurrency.output-join
+        type: output
+        prompt: What does this print?
+        code: |
+          Thread t = Thread.ofVirtual().start(() -> System.out.println("worker"));
+          t.join();
+          System.out.println("main " + t.isVirtual());
+        answers: ["worker\nmain true"]
+        explanation: join() waits for t to finish, so worker always prints first. The thread was built with Thread.ofVirtual(), so isVirtual() is true.
+        hint: What does join wait for?
+
+      - id: java.concurrency.code-start-virtual
+        type: code
+        language: java
+        prompt: The four virtual threads are created but none of their work happens. Fix one call so each task runs on its own virtual thread.
+        starter: |
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.concurrent.atomic.AtomicInteger;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  AtomicInteger hits = new AtomicInteger();
+                  AtomicInteger onVirtual = new AtomicInteger();
+                  List<Thread> threads = new ArrayList<>();
+                  for (int i = 0; i < 4; i++) {
+                      Thread t = Thread.ofVirtual().unstarted(() -> {
+                          if (Thread.currentThread().isVirtual()) onVirtual.incrementAndGet();
+                          for (int j = 0; j < 1000; j++) hits.incrementAndGet();
+                      });
+                      threads.add(t);
+                      t.run();
+                  }
+                  for (Thread t : threads) t.join();
+                  System.out.println("hits " + hits.get() + ", on virtual threads " + onVirtual.get());
+              }
+          }
+        solution: |
+          import java.util.ArrayList;
+          import java.util.List;
+          import java.util.concurrent.atomic.AtomicInteger;
+
+          public class Main {
+              public static void main(String[] args) throws InterruptedException {
+                  AtomicInteger hits = new AtomicInteger();
+                  AtomicInteger onVirtual = new AtomicInteger();
+                  List<Thread> threads = new ArrayList<>();
+                  for (int i = 0; i < 4; i++) {
+                      Thread t = Thread.ofVirtual().unstarted(() -> {
+                          if (Thread.currentThread().isVirtual()) onVirtual.incrementAndGet();
+                          for (int j = 0; j < 1000; j++) hits.incrementAndGet();
+                      });
+                      threads.add(t);
+                      t.start();
+                  }
+                  for (Thread t : threads) t.join();
+                  System.out.println("hits " + hits.get() + ", on virtual threads " + onVirtual.get());
+              }
+          }
+        expected: |
+          hits 4000, on virtual threads 4
+        explanation: run() is not how a thread begins. Called directly on a virtual thread it does nothing (on a platform thread it would run the task on the caller, still without concurrency); start() schedules the task on the new thread. join() on a thread never started returns at once. After start(), join() waits for each to finish, so the counts are final when printed, and AtomicInteger makes the concurrent increments safe (a plain int++ would lose updates).
+        hint: Which Thread method begins a new thread of execution?
+
+  - id: java.jvm-memory
+    title: JVM memory, boxing and GC
+    summary: >
+      Locals and references live on each thread's stack, objects on the shared
+      heap. Autoboxing caches small Integers, unboxing null throws, deep
+      recursion overflows the stack, and the GC frees unreachable objects.
+    level: advanced
+    prereqs: [java.equals-hashcode, java.concurrency]
+    lesson:
+      intro: Knowing where values live explains several runtime surprises — and the questions interviewers ask about the JVM.
+      example:
+        lang: java
+        code: |
+          static void dive(int n) { dive(n + 1); }
+          Integer a = 127, b = 127;
+          Integer c = 128, d = 128;
+          System.out.println((a == b) + " " + (c == d) + " " + c.equals(d));
+          Map<String, Integer> stock = new HashMap<>();
+          try {
+              int pens = stock.get("pen");
+          } catch (NullPointerException e) {
+              System.out.println("NPE: unboxing null");
+          }
+          try {
+              dive(0);
+          } catch (StackOverflowError e) {
+              System.out.println("StackOverflowError");
+          }
+      steps:
+        - text: Each thread has a stack of frames holding its local primitives and references. Objects live on the heap, shared by all threads. a, b, c and d are references to Integer objects on the heap.
+        - text: "Autoboxing calls Integer.valueOf, which caches the values -128 to 127. a and b get the same cached object, while c and d are two separate objects."
+          predict:
+            prompt: What does the first println print?
+            options:
+              - text: "true true true"
+                explanation: 128 is outside the cache, so c and d are different objects and == is false.
+              - text: "false false true"
+                explanation: 127 is inside the cache, so a and b are the same object.
+              - text: "true false true"
+                correct: true
+        - text: stock.get("pen") returns null for a missing key, and assigning it to an int unboxes it with null.intValue(), which throws NullPointerException. Use getOrDefault("pen", 0).
+          predict:
+            prompt: What does int pens = stock.get("pen") do when pen is missing?
+            options:
+              - text: Throws NullPointerException
+                correct: true
+              - text: Sets pens to 0
+                explanation: Maps return null for missing keys, and null cannot be unboxed to an int.
+        - text: Recursion without a base case adds frames until the thread's stack is full and throws StackOverflowError, an Error rather than an Exception. Too many live objects fill the heap and throw OutOfMemoryError. -Xss sets the thread stack size, -Xmx the maximum heap.
+        - text: The garbage collector frees objects that are unreachable from GC roots (thread stacks, static fields, JNI references). It traces reachability rather than counting references, so unreachable cycles are freed too. G1 is the default collector on typical server and desktop machines.
+      takeaway: Compare boxed numbers with equals, never unbox a possible null, and remember that the stack holds frames while the GC reclaims unreachable heap objects.
+    items:
+      - id: java.jvm-memory.output-integer-cache
+        type: output
+        prompt: What does this print with default JVM settings?
+        code: |
+          Integer x = 100, y = 100;
+          Integer p = 1000, q = 1000;
+          System.out.println((x == y) + " " + (p == q) + " " + p.equals(q));
+        options:
+          - text: "true false true"
+            correct: true
+            explanation: 100 comes from the Integer cache (-128 to 127), so x and y are one object; 1000 is boxed into two objects. equals compares values.
+          - text: "true true true"
+            misconception: boxed-eq-compares-value
+            explanation: == on two Integer references compares identity; it only looks right for cached values.
+          - text: "false false true"
+            misconception: no-integer-cache
+            explanation: Integer.valueOf, used by autoboxing, returns cached objects for -128 to 127.
+        explanation: Compare boxed numbers with equals, or unbox them first.
+        hint: Which values does Integer.valueOf cache?
+
+      - id: java.jvm-memory.mcq-gc-cycle
+        type: mcq
+        prompt: Objects A and B reference each other, and nothing else references either of them. What does the garbage collector do?
+        options:
+          - text: It can free both, because neither is reachable from a GC root
+            correct: true
+            explanation: Java's collectors trace from roots (stacks, static fields); unreachable cycles are garbage.
+          - text: It never frees them, because each still has a reference
+            misconception: gc-reference-counting
+            explanation: That is a weakness of pure reference counting; the JVM traces reachability instead.
+          - text: It frees them immediately, at the moment the last outside reference disappears
+            misconception: gc-immediate
+            explanation: Collection happens later, when the collector decides to run; there is no deterministic destruction time.
+        explanation: Reachability, not reference count, decides what is garbage.
+        hint: Where does the GC start its search?
+
+      - id: java.jvm-memory.mcq-stack-overflow
+        type: mcq
+        prompt: A recursive method has no base case. What does the JVM throw?
+        options:
+          - text: StackOverflowError
+            correct: true
+            explanation: Every call pushes a frame on the thread's stack until it is full. Like every Error, it is not meant to be caught in normal code.
+          - text: OutOfMemoryError
+            misconception: recursion-fills-heap
+            explanation: Frames live on the thread's stack, not the heap; OutOfMemoryError means the heap (or metaspace) is exhausted.
+          - text: Nothing; the JIT turns the recursion into a loop
+            misconception: jvm-tail-calls
+            explanation: HotSpot does not eliminate tail calls, so deep recursion always consumes stack.
+        explanation: -Xss changes the per-thread stack size, but the real fix is a base case or an iterative version.
+        hint: Where are method frames stored?
+
+      - id: java.jvm-memory.command-max-heap
+        type: command
+        prompt: Run app.jar with a maximum heap size of 512 MB.
+        answers:
+          - java -Xmx512m -jar app.jar
+          - java -Xmx512M -jar app.jar
+          - java -Xmx512m -jar ./app.jar
+          - java -Xmx512M -jar ./app.jar
+        explanation: -Xmx sets the maximum heap and -Xms the initial heap. JVM options go before -jar; anything after the jar name is passed to the program.
+        hint: The option starts with -X and ends with the size.
+
+      - id: java.jvm-memory.code-boxed-compare
+        type: code
+        language: java
+        prompt: Both lines should print the right answer. Fix the comparison of boxed Integers and the lookup of a missing key.
+        starter: |
+          import java.util.Map;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Map<String, Integer> stock = Map.of("apple", 1000, "pear", 5);
+                  Integer target = 1000;
+                  System.out.println(stock.get("apple") == target);
+
+                  int plums = stock.get("plum");
+                  System.out.println(plums);
+              }
+          }
+        solution: |
+          import java.util.Map;
+
+          public class Main {
+              public static void main(String[] args) {
+                  Map<String, Integer> stock = Map.of("apple", 1000, "pear", 5);
+                  Integer target = 1000;
+                  System.out.println(stock.get("apple").equals(target));
+
+                  int plums = stock.getOrDefault("plum", 0);
+                  System.out.println(plums);
+              }
+          }
+        expected: |
+          true
+          0
+        explanation: Autoboxing calls Integer.valueOf, which reuses cached objects only from -128 to 127, so two boxed 1000s are different objects and == is false. Compare boxed values with equals. Unboxing a null (the missing "plum") throws NullPointerException; getOrDefault returns a real 0 instead.
+        hint: == on two Integer objects compares what?

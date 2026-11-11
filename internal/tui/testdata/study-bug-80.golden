@@ -1,0 +1,24 @@
+
+  ┌─ Logic › Loops ────────────────────────────────────────────────── ○ new ─┐
+  │                                                                          │
+  │ This should print every element. Which line is wrong?                    │
+  │                                                                          │
+  │ Select the faulty line.                                                  │
+  │   1 │ xs := []int{1, 2, 3}                                               │
+  │ ▸ 2 │ for i := 0; i <= len(xs); i++ {                                    │
+  │   3 │     fmt.Println(xs[i])                                             │
+  │   4 │ }                                                                  │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+   next due if                         ✗ Wed 11  ◆ Thu 12  ✓ Fri 13  ▲ Thu 26
+
+
+
+
+
+
+
+
+ devtrainer │ 1 Home   2 Study   3 Tracks  4 Stats                [●] 1/1 ✓0 ✗0
+                               j/k select line · enter submit · h hint · ? help

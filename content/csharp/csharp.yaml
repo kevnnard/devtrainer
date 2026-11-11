@@ -1,0 +1,1954 @@
+track:
+  id: csharp
+  title: C#
+  description: C# 14 on .NET 10 — value and reference types, nullability, records, pattern matching, generics, LINQ, delegates, exceptions, async/await and Span.
+  order: 64
+
+concepts:
+  - id: csharp.basics
+    title: Types, var and arithmetic
+    summary: >
+      C# is statically typed and var is inferred at compile time. int / int
+      truncates toward zero, % keeps the sign of the dividend, int overflow
+      wraps unless checked, and decimal is base 10 while double is binary.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: A C# file can start with plain statements (top-level statements). Every variable has one static type, and the type decides how arithmetic behaves.
+      example:
+        lang: csharp
+        code: |
+          var a = 7;
+          var b = 2;
+          Console.WriteLine(a / b);
+          Console.WriteLine(-7 / 2);
+          Console.WriteLine(-7 % 2);
+          Console.WriteLine(a / 2.0);
+          Console.WriteLine(0.1 + 0.2 == 0.3);
+          Console.WriteLine(0.1m + 0.2m == 0.3m);
+          int big = int.MaxValue;
+          Console.WriteLine(big + 1);
+      steps:
+        - text: var asks the compiler to infer the type from the right-hand side. a is an int for its whole life; a later a = "x" does not compile. var is not dynamic typing.
+        - text: Both operands are int, so / is integer division and drops the fraction. 7 / 2 is 3, and -7 / 2 is -3 because C# truncates toward zero.
+          predict:
+            prompt: What does -7 / 2 print?
+            options:
+              - text: "-4"
+                explanation: That is floor division (Python's //). C# truncates toward zero.
+              - text: "-3"
+                correct: true
+              - text: "-3.5"
+                explanation: Both operands are int, so the result is an int.
+        - text: "% takes the sign of the left operand: -7 % 2 is -1. a / 2.0 has a double operand, so the division is done in double and prints 3.5."
+        - text: double is binary floating point and cannot store 0.1 exactly, so 0.1 + 0.2 == 0.3 is False. decimal (the m suffix) is base 10 and prints True, which is why money uses decimal.
+          predict:
+            prompt: What do the two equality lines print?
+            options:
+              - text: True True
+                explanation: 0.1 and 0.2 have no exact binary representation, so the double sum is 0.30000000000000004.
+              - text: False False
+                explanation: decimal stores base-10 digits exactly, so 0.1m + 0.2m is exactly 0.3m.
+              - text: False True
+                correct: true
+        - text: int.MaxValue + 1 wraps silently to -2147483648, because arithmetic is unchecked by default. checked(big + 1) throws OverflowException instead.
+      takeaway: var is static inference; int / int truncates toward zero; double is binary, decimal is base 10; overflow wraps unless checked.
+    items:
+      - id: csharp.basics.output-int-division
+        type: output
+        prompt: What does this print?
+        code: |
+          Console.WriteLine($"{-9 / 4} {-9 % 4} {9 / 4.0}");
+        answers: ["-2 -1 2.25"]
+        explanation: "-9 / 4 truncates -2.25 toward zero to -2, -9 % 4 keeps the dividend's sign (-1), and 9 / 4.0 is double division."
+        hint: C# truncates toward zero, not toward negative infinity.
+
+      - id: csharp.basics.mcq-var
+        type: mcq
+        prompt: What happens with these two lines?
+        code: |
+          var count = 5;
+          count = "five";
+        options:
+          - text: It does not compile, because count is an int
+            correct: true
+            explanation: var is inferred once at compile time; assigning a string to an int is error CS0029.
+          - text: It compiles and count becomes a string
+            misconception: var-is-dynamic
+            explanation: var is not dynamic. The variable's type is fixed by its initializer.
+          - text: It compiles but throws InvalidCastException at runtime
+            misconception: var-checked-at-runtime
+            explanation: Type errors on var variables are caught by the compiler, not at runtime.
+        explanation: var saves typing, never type safety. Use dynamic only when you really want runtime binding.
+        hint: When is the type of a var variable decided?
+
+      - id: csharp.basics.output-overflow
+        type: output
+        prompt: What does this print?
+        code: |
+          int n = int.MaxValue;
+          n++;
+          Console.WriteLine(n);
+        options:
+          - text: "-2147483648"
+            correct: true
+            explanation: Integer arithmetic is unchecked by default, so the value wraps around to int.MinValue.
+          - text: "2147483648"
+            misconception: int-promotes-on-overflow
+            explanation: An int stays a 32-bit int; it is never widened to long automatically.
+          - text: An OverflowException is thrown
+            misconception: overflow-throws-by-default
+            explanation: Only checked code throws. Wrap the expression in checked(...) or enable CheckForOverflowUnderflow.
+        explanation: Wrapping is fast but silent; use checked where an overflow would be a bug.
+        hint: Is arithmetic checked or unchecked by default?
+
+      - id: csharp.basics.cloze-checked
+        type: cloze
+        prompt: "Make this addition throw OverflowException instead of wrapping: int total = ___(price + tax);"
+        answers: ["checked"]
+        case_sensitive: true
+        explanation: checked(expr) evaluates expr with overflow checks; a checked { } block does the same for statements.
+        hint: The keyword is the opposite of unchecked.
+
+      - id: csharp.basics.code-average-decimal
+        type: code
+        language: csharp
+        prompt: Print the exact average with two decimals, then check that 0.1 + 0.2 equals 0.3 using a type that stores those values exactly. Fix the marked lines.
+        starter: |
+          using System.Globalization;
+
+          int[] scores = [7, 8, 8];
+          int sum = 0;
+          foreach (var s in scores) sum += s;
+          var average = sum / scores.Length; // fix
+          Console.WriteLine(average.ToString("0.00", CultureInfo.InvariantCulture));
+
+          var total = 0.1 + 0.2; // fix
+          Console.WriteLine(total == 0.3); // fix
+        solution: |
+          using System.Globalization;
+
+          int[] scores = [7, 8, 8];
+          int sum = 0;
+          foreach (var s in scores) sum += s;
+          var average = (double)sum / scores.Length;
+          Console.WriteLine(average.ToString("0.00", CultureInfo.InvariantCulture));
+
+          var total = 0.1m + 0.2m;
+          Console.WriteLine(total == 0.3m);
+        expected: |
+          7.67
+          True
+        explanation: var takes the type of the expression, and int / int is integer division, so average is the int 7. Casting one operand to double makes it 7.666… The m suffix makes decimal literals, a base-10 type that stores 0.1 exactly; double cannot, and the compiler will not compare a double with a decimal without a cast.
+        hint: What type does var infer from sum / scores.Length, and which suffix makes a decimal?
+
+  - id: csharp.value-reference
+    title: Value types, reference types and structs
+    summary: >
+      Assigning a struct copies its fields; assigning a class copies the
+      reference. Arguments are passed by value unless marked ref or out.
+      Boxing copies a value type into a heap object.
+    level: beginner
+    prereqs: [csharp.basics]
+    lesson:
+      intro: Every C# type is either a value type (struct, enum, int, bool, DateTime) or a reference type (class, record, array, string). The difference shows up on every assignment.
+      example:
+        lang: csharp
+        code: |
+          var p = new Point { X = 1 };
+          var q = p;
+          q.X = 10;
+          Console.WriteLine($"{p.X} {q.X}");
+          var a = new Box { X = 1 };
+          var b = a;
+          b.X = 10;
+          Console.WriteLine($"{a.X} {b.X}");
+          object boxed = p.X;
+          p.X = 99;
+          Console.WriteLine(boxed);
+
+          struct Point { public int X; }
+          class Box { public int X; }
+      steps:
+        - text: Point is a struct, so var q = p copies the whole value. Changing q.X leaves p alone and the line prints 1 10.
+          predict:
+            prompt: What does the first WriteLine print?
+            options:
+              - text: 1 10
+                correct: true
+              - text: 10 10
+                explanation: That would happen with a class. A struct assignment copies the fields.
+        - text: Box is a class. var b = a copies the reference, so a and b point at one object and the line prints 10 10.
+          predict:
+            prompt: What does the second WriteLine print?
+            options:
+              - text: 1 10
+                explanation: a and b are two names for the same object, so both see X = 10.
+              - text: 10 10
+                correct: true
+        - text: "object boxed = p.X boxes the int: it copies the value 1 into a new heap object. Changing p.X later does not touch the box, so it prints 1."
+        - text: Arguments work the same way. A method gets a copy of a struct, or a copy of a reference (so it can change the object but not swap it for another). ref passes the variable itself.
+      takeaway: Value types copy their data on assignment; reference types copy the reference. ref passes the variable itself.
+    items:
+      - id: csharp.value-reference.output-struct-in-list
+        type: output
+        prompt: What does this print?
+        code: |
+          var list = new List<Counter> { new Counter() };
+          var c = list[0];
+          c.N++;
+          Console.WriteLine(list[0].N);
+
+          struct Counter { public int N; }
+        options:
+          - text: "0"
+            correct: true
+            explanation: list[0] returns a copy of the struct; c.N++ changes that copy only.
+          - text: "1"
+            misconception: struct-is-reference
+            explanation: Counter is a struct, so c is an independent copy, not a reference into the list.
+        explanation: Mutable structs inside collections are a classic trap; prefer readonly structs or classes for things you mutate.
+        hint: Is Counter a class or a struct?
+
+      - id: csharp.value-reference.output-ref-param
+        type: output
+        prompt: What does this print?
+        code: |
+          int a = 1;
+          int[] arr = [10];
+          Bump(a);
+          BumpFirst(arr);
+          BumpRef(ref a);
+          Console.WriteLine($"{a} {arr[0]}");
+
+          static void Bump(int x) => x++;
+          static void BumpFirst(int[] xs) => xs[0]++;
+          static void BumpRef(ref int x) => x++;
+        answers: ["2 11"]
+        explanation: Bump changes its own copy of a. BumpFirst gets a copy of the reference, which still points at the same array. BumpRef receives the variable a itself.
+        hint: Three calls, but only two of them reach the caller's data.
+
+      - id: csharp.value-reference.mcq-modify-indexer
+        type: mcq
+        prompt: Counter is a mutable struct. What happens with list[0].N++?
+        code: |
+          var list = new List<Counter> { new Counter() };
+          list[0].N++;
+
+          struct Counter { public int N; }
+        options:
+          - text: It does not compile; the indexer returns a temporary copy that is not a variable
+            correct: true
+            explanation: Error CS1612. The compiler refuses because the change would be lost on a copy.
+          - text: It increments the element stored in the list
+            misconception: struct-is-reference
+            explanation: List<T>'s indexer returns the struct by value, so there is no stored element to modify.
+          - text: It compiles and silently increments a copy
+            misconception: compiler-allows-lost-mutation
+            explanation: That silent loss is exactly what CS1612 prevents. Copy, modify and assign back instead.
+        explanation: "Fix: var c = list[0]; c.N++; list[0] = c; or make Counter a class. Arrays are different: arr[0].N++ works because an array element is a variable."
+        hint: What does List<T>'s indexer return for a struct?
+
+      - id: csharp.value-reference.multi-value-types
+        type: multi
+        prompt: Which of these are value types?
+        options:
+          - text: int
+            correct: true
+            explanation: int is an alias of the struct System.Int32.
+          - text: DateTime
+            correct: true
+            explanation: DateTime is a struct.
+          - text: int?
+            correct: true
+            explanation: int? is Nullable<int>, a struct with HasValue and Value.
+          - text: An enum
+            correct: true
+            explanation: Enums are value types backed by an integer type.
+          - text: string
+            misconception: string-is-value-type
+            explanation: string is a reference type; it only feels like a value because it is immutable and == compares contents.
+          - text: int[]
+            misconception: array-of-values-is-value-type
+            explanation: Every array is a reference type, even when its elements are value types.
+          - text: "A positional record: record Person(string Name)"
+            misconception: record-is-struct
+            explanation: record means record class, a reference type. Only record struct is a value type.
+        explanation: struct, enum and the numeric/bool/char types are value types; class, record, interface, array, delegate and string are reference types.
+        hint: Ask "is it declared as a struct?".
+
+      - id: csharp.value-reference.code-struct-copy
+        type: code
+        language: csharp
+        prompt: Counter must stay a struct. Make the first counter in the list really reach 1, so the program prints 1 0.
+        starter: |
+          var counters = new List<Counter> { new(), new() };
+
+          var first = counters[0];
+          first.Increment();
+
+          Console.WriteLine($"{counters[0].Value} {counters[1].Value}");
+
+          struct Counter
+          {
+              public int Value;
+              public void Increment() => Value++;
+          }
+        solution: |
+          var counters = new List<Counter> { new(), new() };
+
+          var first = counters[0];
+          first.Increment();
+          counters[0] = first;
+
+          Console.WriteLine($"{counters[0].Value} {counters[1].Value}");
+
+          struct Counter
+          {
+              public int Value;
+              public void Increment() => Value++;
+          }
+        expected: |
+          1 0
+        explanation: A struct is a value type, so counters[0] returns a copy and Increment changes only that copy. Writing the copy back stores the new value in the list. Had Counter been a class, first would be a second reference to the same object.
+        hint: What does reading a struct out of a List give you?
+
+  - id: csharp.strings-equality
+    title: Strings and equality
+    summary: >
+      Strings are immutable reference types whose == compares contents. The
+      == chosen depends on the static type, so two strings typed as object
+      compare references. Use StringComparison for explicit comparisons and
+      StringBuilder to build strings in loops.
+    level: beginner
+    prereqs: [csharp.value-reference]
+    lesson:
+      intro: "string is a reference type that behaves like a value. Two rules explain almost every surprise: strings never change, and == is picked by the compiler from the static types."
+      example:
+        lang: csharp
+        code: |
+          string s = "hi";
+          string t = s;
+          t += "!";
+          Console.WriteLine($"{s} {t}");
+          string a = "abc";
+          string b = new string(new[] { 'a', 'b', 'c' });
+          Console.WriteLine(a == b);
+          object oa = a, ob = b;
+          Console.WriteLine(oa == ob);
+          Console.WriteLine(oa.Equals(ob));
+          Console.WriteLine("Hello".Equals("hello", StringComparison.OrdinalIgnoreCase));
+      steps:
+        - text: t += "!" does not change the string; it creates a new one and points t at it. s still refers to "hi", so the line prints hi hi!.
+          predict:
+            prompt: What does the first line print?
+            options:
+              - text: hi! hi!
+                explanation: Strings are immutable. += builds a new string, so s is untouched.
+              - text: hi hi!
+                correct: true
+        - text: a and b are different objects with the same characters. string overloads ==, so a == b compares contents and prints True.
+        - text: With both sides typed as object, the compiler picks object's ==, which compares references, and prints False. Equals is virtual, so oa.Equals(ob) still runs string's version and prints True.
+          predict:
+            prompt: What do oa == ob and oa.Equals(ob) print?
+            options:
+              - text: True True
+                explanation: Operators are chosen at compile time from the static type, and for object == means "same reference".
+              - text: False True
+                correct: true
+              - text: False False
+                explanation: Equals is a virtual method, so the runtime calls string.Equals, which compares characters.
+        - text: For explicit comparisons pass a StringComparison. Ordinal compares char codes and is the right default for keys, IDs and protocols; OrdinalIgnoreCase ignores case, so the last line prints True.
+        - text: Because strings are immutable, s += piece in a loop copies the whole string every time, which is O(n²). StringBuilder appends into a growing buffer; call ToString() once at the end.
+      takeaway: Strings are immutable; == on string compares contents only when the compiler sees string types; use StringComparison and StringBuilder.
+    items:
+      - id: csharp.strings-equality.output-object-eq
+        type: output
+        prompt: What does this print?
+        code: |
+          string x = "hello";
+          string y = new string("hello".ToCharArray());
+          object ox = x, oy = y;
+          Console.WriteLine($"{x == y} {ox == oy} {ox.Equals(oy)}");
+        options:
+          - text: True False True
+            correct: true
+            explanation: string's == compares contents, object's == compares references, and the virtual Equals runs string's content comparison.
+          - text: True True True
+            misconception: operator-is-virtual
+            explanation: Operators are static and chosen from the compile-time type; typed as object, == is a reference check.
+          - text: False False True
+            misconception: string-eq-is-reference
+            explanation: string overloads == to compare characters, so x == y is True.
+        explanation: Overloaded operators bind at compile time; virtual methods bind at runtime.
+        hint: Which == does the compiler pick when both sides are object?
+
+      - id: csharp.strings-equality.output-immutable
+        type: output
+        prompt: What does this print?
+        code: |
+          var s = "abc";
+          s.ToUpper();
+          var t = s.Replace('a', 'z');
+          Console.WriteLine(s + " " + t);
+        answers: ["abc zbc"]
+        explanation: String methods never modify the string; they return a new one. The result of s.ToUpper() is discarded.
+        hint: Where does the result of ToUpper go?
+
+      - id: csharp.strings-equality.mcq-concat-loop
+        type: mcq
+        prompt: A loop runs result += line for 100,000 lines. Why is StringBuilder faster?
+        options:
+          - text: Each += allocates a new string and copies everything so far, so the loop is O(n²); StringBuilder appends into a buffer
+            correct: true
+            explanation: Immutable strings make repeated concatenation quadratic in the total length.
+          - text: It is not; the compiler turns the loop into a StringBuilder
+            misconception: compiler-optimizes-loop-concat
+            explanation: The compiler only merges concatenations inside one expression (into string.Concat), not across loop iterations.
+          - text: Because += changes the string in place, which is unsafe across threads
+            misconception: strings-are-mutable
+            explanation: Strings are immutable; += creates a new string every time.
+        explanation: For a known list, string.Join or string.Concat is simpler still.
+        hint: What does += do to an immutable string?
+
+      - id: csharp.strings-equality.cloze-ordinal-ignore-case
+        type: cloze
+        prompt: "Compare two header names ignoring case, without culture rules: string.Equals(a, b, StringComparison.___)"
+        answers: ["OrdinalIgnoreCase"]
+        case_sensitive: true
+        explanation: Ordinal compares char codes; OrdinalIgnoreCase does the same after case folding. Culture-aware comparisons belong to text shown to people.
+        hint: Ordinal, plus ignoring case.
+
+      - id: csharp.strings-equality.code-ignore-case
+        type: code
+        language: csharp
+        prompt: Count every input that means admin, ignoring surrounding spaces and case, then compare the two values by content.
+        starter: |
+          string[] inputs = ["admin", "ADMIN", " Admin ", "guest"];
+          int admins = 0;
+          foreach (var input in inputs)
+          {
+              if (input == "admin") admins++;
+          }
+          Console.WriteLine($"{admins} admins");
+
+          object boxed = "admin";
+          string built = new string(['a', 'd', 'm', 'i', 'n']);
+          Console.WriteLine(ReferenceEquals(boxed, built));
+        solution: |
+          string[] inputs = ["admin", "ADMIN", " Admin ", "guest"];
+          int admins = 0;
+          foreach (var input in inputs)
+          {
+              if (string.Equals(input.Trim(), "admin", StringComparison.OrdinalIgnoreCase)) admins++;
+          }
+          Console.WriteLine($"{admins} admins");
+
+          object boxed = "admin";
+          string built = new string(['a', 'd', 'm', 'i', 'n']);
+          Console.WriteLine(boxed.Equals(built));
+        expected: |
+          3 admins
+          True
+        explanation: For two strings, == compares content but is case sensitive; StringComparison.OrdinalIgnoreCase compares ignoring case, and Trim removes the spaces. A string built at run time is a different object from the literal, so ReferenceEquals (and == when one side is typed object) is False; Equals is virtual and compares the characters.
+        hint: Which StringComparison ignores case, and which method compares content even through an object variable?
+
+  - id: csharp.nullable
+    title: Nullable types and null operators
+    summary: >
+      int? is Nullable<int>, a struct with HasValue. string? is a nullable
+      reference type annotation: the compiler warns, nothing changes at
+      runtime. ?. short-circuits on null, ?? supplies a fallback, ??= assigns
+      only when null, and ! silences a warning without checking anything.
+    level: beginner
+    prereqs: [csharp.value-reference]
+    lesson:
+      intro: C# has two kinds of nullable. int? is a real runtime type. string? is a promise the compiler tracks; new projects and file-based apps turn that tracking on.
+      example:
+        lang: csharp
+        code: |
+          int? maybe = null;
+          Console.WriteLine(maybe.HasValue);
+          Console.WriteLine(maybe ?? 42);
+          string? name = null;
+          Console.WriteLine(name?.Length);
+          Console.WriteLine(name?.Length ?? 0);
+          name ??= "Ana";
+          Console.WriteLine(name.Length);
+      steps:
+        - text: int? is Nullable<int>, a struct that holds a value plus a HasValue flag. HasValue is False here, and maybe ?? 42 returns 42.
+        - text: name?.Length evaluates to null when name is null instead of throwing. The result type is int?, and printing a null int? prints an empty line.
+          predict:
+            prompt: What does Console.WriteLine(name?.Length) print?
+            options:
+              - text: An empty line
+                correct: true
+              - text: "0"
+                explanation: ?. produces null, not 0. Add ?? 0 to get a number.
+              - text: It throws NullReferenceException
+                explanation: ?. stops before calling .Length when name is null.
+        - text: name?.Length ?? 0 combines both operators and prints 0.
+        - text: name ??= "Ana" assigns only when name is null. After it, flow analysis knows name is not null, so name.Length gets no warning and prints 3.
+          predict:
+            prompt: What does the last line print?
+            options:
+              - text: "0"
+                explanation: ??= assigned "Ana" because name was null.
+              - text: "3"
+                correct: true
+        - text: "string? and string are the same runtime type; the annotation only drives warnings such as CS8602 (possible null dereference). name! silences the warning but checks nothing: if the value is null, the next dereference still throws."
+      takeaway: int? is a struct; string? is compile-time only. Use ?., ?? and ??= to handle null, and treat ! as a promise you must keep.
+    items:
+      - id: csharp.nullable.output-operators
+        type: output
+        prompt: What does this print?
+        code: |
+          string? s = null;
+          int? len = s?.Length;
+          Console.WriteLine(len is null);
+          Console.WriteLine(s?.Length ?? -1);
+          s ??= "abc";
+          s ??= "xyz";
+          Console.WriteLine(s);
+        answers: ["True\n-1\nabc"]
+        explanation: ?. yields null for a null receiver, ?? supplies -1, and the second ??= does nothing because s already holds "abc".
+        hint: ??= only assigns when the left side is null.
+
+      - id: csharp.nullable.mcq-nrt-runtime
+        type: mcq
+        prompt: Nullable reference types are enabled and a method is declared void Greet(string name). What does that guarantee at runtime?
+        options:
+          - text: Nothing; callers get warnings, but null can still arrive (via !, reflection or code without annotations)
+            correct: true
+            explanation: The annotation is metadata for the compiler. Validate public inputs, e.g. ArgumentNullException.ThrowIfNull(name).
+          - text: The runtime throws as soon as null is passed
+            misconception: nrt-runtime-check
+            explanation: No runtime check is generated; null flows through until something dereferences it.
+          - text: string and string? are different runtime types, like int and int?
+            misconception: nrt-is-nullable-struct
+            explanation: Only value types get Nullable<T>. For reference types the ? is an annotation on the same type.
+        explanation: Nullable reference types catch most null bugs at compile time, but they are static analysis, not enforcement.
+        hint: Is string? a different type at runtime?
+
+      - id: csharp.nullable.bug-bang
+        type: bug
+        prompt: This throws NullReferenceException. Which line causes it?
+        code: |
+          string? FindUser(int id) => id == 1 ? "ana" : null;
+
+          var user = FindUser(2);
+          var display = user!.ToUpper();
+          Console.WriteLine(display ?? "unknown");
+        bug_line: 4
+        explanation: The ! only silences the compiler warning; user is still null and .ToUpper() throws. Write user?.ToUpper() so the ?? fallback can apply.
+        hint: Which operator suppresses a warning without adding a check?
+
+      - id: csharp.nullable.cloze-coalesce-assign
+        type: cloze
+        prompt: "Create the cache only the first time it is needed: cache ___ new Dictionary<string, int>();"
+        answers: ["??="]
+        explanation: x ??= y assigns y only when x is null and returns the resulting value.
+        hint: The null-coalescing operator, turned into an assignment.
+
+      - id: csharp.nullable.code-null-operators
+        type: code
+        language: csharp
+        prompt: Bo has no email. Print the email length of each user, or 0 when it is missing, using the null operators.
+        starter: |
+          User[] users = [new("ana", "ana@x.com"), new("bo", null)];
+          foreach (var u in users)
+          {
+              int length = u.Email.Length;
+              Console.WriteLine($"{u.Name} {length}");
+          }
+
+          record User(string Name, string? Email);
+        solution: |
+          User[] users = [new("ana", "ana@x.com"), new("bo", null)];
+          foreach (var u in users)
+          {
+              int length = u.Email?.Length ?? 0;
+              Console.WriteLine($"{u.Name} {length}");
+          }
+
+          record User(string Name, string? Email);
+        expected: |
+          ana 9
+          bo 0
+        explanation: string? says Email may be null, and the compiler warns (CS8602) when you dereference it unchecked; at run time that is a NullReferenceException. ?. stops and gives null when the left side is null, so u.Email?.Length is an int?, and ?? replaces null with 0.
+        hint: One operator short-circuits on null, another supplies a fallback.
+
+  - id: csharp.classes-records
+    title: Classes, records and interfaces
+    summary: >
+      Classes compare by reference unless they override equality. Records
+      generate value equality, ToString and with-copies. An interface is a
+      contract; a type can implement many interfaces but inherit one class.
+    level: intermediate
+    prereqs: [csharp.strings-equality]
+    lesson:
+      intro: Classes model things with identity; records model data whose identity is its values. Interfaces say what a type can do without saying how.
+      example:
+        lang: csharp
+        code: |
+          var a = new PointC(1, 2);
+          var b = new PointC(1, 2);
+          Console.WriteLine(a == b);
+          var r1 = new PointR(1, 2);
+          var r2 = new PointR(1, 2);
+          Console.WriteLine(r1 == r2);
+          var r3 = r1 with { Y = 5 };
+          Console.WriteLine(r3);
+          IShape s = new Square(3);
+          Console.WriteLine(s.Area());
+
+          class PointC(int x, int y) { public int X => x; public int Y => y; }
+          record PointR(int X, int Y);
+          interface IShape { double Area(); }
+          record Square(double Side) : IShape { public double Area() => Side * Side; }
+      steps:
+        - text: PointC is a class with a primary constructor (C# 12). Without overriding Equals, == on two class instances compares references, so a == b prints False.
+          predict:
+            prompt: What does a == b print?
+            options:
+              - text: "False"
+                correct: true
+              - text: "True"
+                explanation: Classes have reference equality by default; a and b are two objects.
+        - text: The positional record PointR generates init-only properties X and Y, a constructor, Equals/GetHashCode over the fields, ==, ToString and Deconstruct. r1 == r2 compares values and prints True.
+        - text: with copies a record and changes the listed properties; r1 is untouched. The generated ToString prints the type and its properties.
+          predict:
+            prompt: What does Console.WriteLine(r3) print?
+            options:
+              - text: PointR
+                explanation: Records override ToString to list their public properties.
+              - text: PointR { X = 1, Y = 5 }
+                correct: true
+              - text: "(1, 5)"
+                explanation: That is how a tuple prints; a record prints its name and named properties.
+        - text: Square implements IShape, so it can be used through the interface and s.Area() prints 9. A record is still a class (a reference type); record struct is the value-type version.
+        - text: A type inherits at most one base class but can implement any number of interfaces. Since C# 8, interfaces can also carry default method bodies.
+      takeaway: Class equality is identity, record equality is values; with makes changed copies; interfaces are contracts a type can stack.
+    items:
+      - id: csharp.classes-records.output-with
+        type: output
+        prompt: What does this print?
+        code: |
+          var p = new Person("Ana", 30);
+          var q = p with { Age = 31 };
+          Console.WriteLine(p);
+          Console.WriteLine(q.Age);
+          Console.WriteLine(p == (q with { Age = 30 }));
+
+          record Person(string Name, int Age);
+        answers: ["Person { Name = Ana, Age = 30 }\n31\nTrue"]
+        explanation: with creates a new record and leaves p unchanged; making a copy of q with Age = 30 gives a record equal to p by value.
+        hint: Does with modify the original?
+
+      - id: csharp.classes-records.output-record-array
+        type: output
+        prompt: What does this print?
+        code: |
+          var a = new User("ana", ["admin"]);
+          var b = new User("ana", ["admin"]);
+          Console.WriteLine(a == b);
+
+          record User(string Name, string[] Roles);
+        options:
+          - text: "False"
+            correct: true
+            explanation: The generated Equals compares each field with its default equality, and arrays compare by reference. The two arrays are different objects.
+          - text: "True"
+            misconception: record-deep-equality
+            explanation: Record equality is shallow. A collection field must be the same instance, or use a type with value equality.
+        explanation: Value equality goes only one level deep; for collection fields write your own Equals or store an immutable value type.
+        hint: How does an array compare to another array?
+
+      - id: csharp.classes-records.mcq-interface-vs-abstract
+        type: mcq
+        prompt: Why choose an interface instead of an abstract base class for a capability like ILogger?
+        options:
+          - text: A class can implement many interfaces but inherit from only one class
+            correct: true
+            explanation: Interfaces leave the single base-class slot free and let unrelated types share a contract.
+          - text: Interfaces cannot contain any method bodies, so they are lighter
+            misconception: interfaces-no-bodies
+            explanation: Since C# 8 interfaces can have default implementations and static members.
+          - text: Abstract classes cannot have constructors
+            misconception: abstract-no-constructor
+            explanation: Abstract classes can have constructors; derived classes call them.
+        explanation: Use an abstract class when you want shared state or protected helpers; use an interface for a contract.
+        hint: How many base classes can a C# class have?
+
+      - id: csharp.classes-records.parsons-record-interface
+        type: parsons
+        prompt: Order the lines of a file-based app that defines an interface and a record implementing it.
+        lines:
+          - "IGreeter g = new Greeter(\"Hi\");"
+          - "Console.WriteLine(g.Greet(\"Ana\"));"
+          - "interface IGreeter { string Greet(string name); }"
+          - "record Greeter(string Prefix) : IGreeter"
+          - "{"
+          - "    public string Greet(string name) => $\"{Prefix} {name}\";"
+          - "}"
+        explanation: Top-level statements must come before any type declaration in the file (otherwise error CS8803). Here the interface is declared before the record that implements it.
+        hint: Where must top-level statements go?
+
+      - id: csharp.classes-records.code-record-equality
+        type: code
+        language: csharp
+        prompt: Two Money values with the same amount and currency should be equal, count once in a HashSet and print their contents. Turn Money into a positional record.
+        starter: |
+          var a = new Money(10, "EUR");
+          var b = new Money(10, "EUR");
+          Console.WriteLine(a == b);
+          Console.WriteLine(new HashSet<Money> { a, b }.Count);
+          Console.WriteLine(a);
+
+          sealed class Money(decimal amount, string currency)
+          {
+              public decimal Amount { get; } = amount;
+              public string Currency { get; } = currency;
+          }
+        solution: |
+          var a = new Money(10, "EUR");
+          var b = new Money(10, "EUR");
+          Console.WriteLine(a == b);
+          Console.WriteLine(new HashSet<Money> { a, b }.Count);
+          Console.WriteLine(a);
+
+          sealed record Money(decimal Amount, string Currency);
+        expected: |
+          True
+          1
+          Money { Amount = 10, Currency = EUR }
+        explanation: A class compares references by default, so two separately created objects are different, the set keeps both and ToString prints the type name. A record generates value-based Equals, GetHashCode, == and a ToString listing its properties; positional parameters become init-only properties.
+        hint: One line declares a record with Amount and Currency properties.
+
+  - id: csharp.properties-init
+    title: Properties, init, required and field
+    summary: >
+      Properties wrap a value behind get/set accessors. init allows setting
+      only during construction, required forces callers to set a member in
+      the object initializer, and C# 14's field keyword reaches the
+      compiler-generated backing field from an accessor.
+    level: intermediate
+    prereqs: [csharp.classes-records]
+    lesson:
+      intro: A property looks like a field to the caller but runs accessor code. The keywords init, required and field decide who can set it, and when.
+      example:
+        lang: csharp
+        code: |
+          var u = new User { Id = 1, Name = "  ana " };
+          Console.WriteLine($"[{u.Name}] {u.Id} {u.Created}");
+          u.Name = "bo";
+          Console.WriteLine(u.Name.Length);
+
+          class User
+          {
+              public required int Id { get; init; }
+              public string Name
+              {
+                  get;
+                  set => field = value.Trim();
+              } = "";
+              public string Created { get; } = "today";
+          }
+      steps:
+        - text: required means every object initializer must set Id; new User { Name = "x" } is error CS9035. init means Id can be set in the initializer but not afterwards; u.Id = 2 on line 3 would be error CS8852.
+          predict:
+            prompt: Would adding u.Id = 2; after the first line compile?
+            options:
+              - text: Yes, init works like set
+                explanation: init accessors only run during object creation (constructor, initializer or with).
+              - text: No, Id is init-only
+                correct: true
+        - text: "C# 14's field keyword names the backing field the compiler generates. Name keeps an automatic get; and only customizes set, so the stored value is trimmed: [ana]."
+          predict:
+            prompt: What does the first WriteLine print?
+            options:
+              - text: "[  ana ] 1 today"
+                explanation: The initializer goes through Name's set accessor, which trims the value.
+              - text: "[ana] 1 today"
+                correct: true
+        - text: Assigning u.Name = "bo" also runs the setter, so the length printed is 2.
+        - text: Created has only get; it can be set by its initializer or a constructor, never from outside. Before C# 14 you needed an explicit private field to add logic to one accessor.
+      takeaway: init = set only while constructing; required = callers must set it; field = the hidden backing field, usable from your accessor code.
+    items:
+      - id: csharp.properties-init.mcq-init-assign
+        type: mcq
+        prompt: What happens on the second line?
+        code: |
+          var p = new Point { X = 1 };
+          p.X = 2;
+
+          class Point { public int X { get; init; } }
+        options:
+          - text: Compile error; an init-only property can only be set during object creation
+            correct: true
+            explanation: Error CS8852. Use with on a record, or a new object initializer, to get a changed copy.
+          - text: It compiles and throws InvalidOperationException at runtime
+            misconception: init-runtime-check
+            explanation: init is enforced by the compiler; there is no runtime check.
+          - text: It works; init is just another spelling of set
+            misconception: init-is-set
+            explanation: init restricts assignment to constructors, object initializers and with expressions.
+        explanation: init gives immutable objects that are still built with object-initializer syntax.
+        hint: When may an init accessor run?
+
+      - id: csharp.properties-init.mcq-required
+        type: mcq
+        prompt: Account declares public required string Email { get; set; }. What does var a = new Account(); do?
+        options:
+          - text: It does not compile; Email must be set in the object initializer
+            correct: true
+            explanation: Error CS9035. required moves "you forgot to set this" from runtime to compile time.
+          - text: It compiles with a nullable warning and Email is null
+            misconception: required-is-warning
+            explanation: Missing a required member is an error, not a warning.
+          - text: It throws ArgumentNullException at runtime
+            misconception: required-runtime-check
+            explanation: required is checked by the compiler at the call site; nothing is generated at runtime.
+        explanation: A constructor marked [SetsRequiredMembers] tells the compiler it sets all required members itself.
+        hint: Is required checked at compile time or at runtime?
+
+      - id: csharp.properties-init.output-field-keyword
+        type: output
+        prompt: What does this print?
+        code: |
+          var t = new Temperature();
+          t.Celsius = -300;
+          Console.WriteLine(t.Celsius);
+          t.Celsius = 25.5;
+          Console.WriteLine(t.Celsius);
+
+          class Temperature
+          {
+              public double Celsius
+              {
+                  get;
+                  set => field = Math.Max(value, -273.15);
+              }
+          }
+        answers: ["-273.15\n25.5"]
+        explanation: The setter clamps the value before storing it in the compiler-generated backing field that field refers to.
+        hint: What does Math.Max(-300, -273.15) return?
+
+      - id: csharp.properties-init.cloze-field
+        type: cloze
+        prompt: "C# 14: store the trimmed value without declaring a backing field: public string Name { get; set => ___ = value.Trim(); }"
+        answers: ["field"]
+        case_sensitive: true
+        explanation: field is a contextual keyword inside property accessors that refers to the synthesized backing field.
+        hint: A contextual keyword added in C# 14.
+
+      - id: csharp.properties-init.code-field-keyword
+        type: code
+        language: csharp
+        prompt: Celsius must never go below -273. Give its setter a body that clamps the value, using the field keyword instead of declaring a backing field.
+        starter: |
+          Sensor[] sensors =
+          [
+              new() { Name = "sensor-1", Celsius = -300 },
+              new() { Name = "sensor-2", Celsius = 21 },
+          ];
+          foreach (var s in sensors) Console.WriteLine($"{s.Name} {s.Celsius}");
+
+          class Sensor
+          {
+              public required string Name { get; init; }
+              public int Celsius { get; set; }
+          }
+        solution: |
+          Sensor[] sensors =
+          [
+              new() { Name = "sensor-1", Celsius = -300 },
+              new() { Name = "sensor-2", Celsius = 21 },
+          ];
+          foreach (var s in sensors) Console.WriteLine($"{s.Name} {s.Celsius}");
+
+          class Sensor
+          {
+              public required string Name { get; init; }
+              public int Celsius { get; set => field = Math.Max(value, -273); }
+          }
+        expected: |
+          sensor-1 -273
+          sensor-2 21
+        explanation: In C# 14 the field keyword names the compiler-generated backing field, so one accessor can have a body while get stays automatic. required forces every object initializer to set Name, and init allows setting it only during initialization.
+        hint: "set => field = ..."
+
+  - id: csharp.pattern-matching
+    title: Pattern matching and switch expressions
+    summary: >
+      A switch expression tests arms from top to bottom and returns the first
+      match. Patterns include types, constants, relational (< 0), logical
+      (and/or/not), property ({ Length: 0 }) and list ([first, .., last])
+      patterns. The compiler reports unreachable arms and warns when arms
+      are not exhaustive.
+    level: intermediate
+    prereqs: [csharp.classes-records, csharp.nullable]
+    lesson:
+      intro: Pattern matching asks "what shape is this value?" and binds the parts you need in the same step.
+      example:
+        lang: csharp
+        code: |
+          object?[] inputs = [42, -3, "hi", new[] { 1, 2, 3 }, null];
+          foreach (var x in inputs) Console.WriteLine(Describe(x));
+
+          static string Describe(object? o) => o switch
+          {
+              int n when n < 0 => "negative int",
+              int n => $"int {n}",
+              string { Length: 0 } => "empty string",
+              string s => $"string of {s.Length}",
+              int[] and [var first, .., var last] => $"array {first}..{last}",
+              null => "null",
+              _ => "something else",
+          };
+      steps:
+        - text: "Arms are tried in order and the first match wins. 42 skips the guarded arm (when n < 0 is false) and matches int n: int 42. -3 matches the first arm: negative int."
+          predict:
+            prompt: What if int n came before int n when n < 0?
+            options:
+              - text: Negative numbers would still reach the more specific arm
+                explanation: The switch does not look for the most specific arm; it takes the first match.
+              - text: It would not compile, because the guarded arm becomes unreachable
+                correct: true
+        - text: 'string { Length: 0 } is a property pattern; "hi" fails it and matches string s, printing string of 2.'
+        - text: "int[] and [var first, .., var last] first narrows the object to int[], then applies a list pattern: .. skips any number of elements in the middle. The array prints array 1..3."
+          predict:
+            prompt: Would the list pattern match new[] { 7 }?
+            options:
+              - text: Yes, first and last are both 7
+                explanation: first and last are two different positions, so the pattern needs at least two elements.
+              - text: No, it needs at least two elements
+                correct: true
+        - text: null matches the null pattern. _ is the discard that matches anything left; without it the compiler warns that the switch is not exhaustive (CS8509), and an unmatched value throws SwitchExpressionException.
+      takeaway: First matching arm wins; patterns test type, value, properties and list shape; finish with _ or cover every case.
+    items:
+      - id: csharp.pattern-matching.output-list-patterns
+        type: output
+        prompt: What does this print?
+        code: |
+          int[][] data = [[], [7], [1, 2], [1, 2, 3, 4]];
+          foreach (var xs in data)
+              Console.WriteLine(xs switch
+              {
+                  [] => "empty",
+                  [var only] => $"one: {only}",
+                  [var a, var b] => $"pair: {a + b}",
+                  [var first, .., var last] => $"many: {first}-{last}",
+              });
+        answers: ["empty\none: 7\npair: 3\nmany: 1-4"]
+        explanation: "Each list pattern fixes a length: [] is 0, [x] is 1, [a, b] is 2, and [first, .., last] is 2 or more; since 2 was already taken, it gets the rest."
+        hint: .. matches zero or more elements.
+
+      - id: csharp.pattern-matching.mcq-arm-order
+        type: mcq
+        prompt: What happens with this switch expression?
+        code: |
+          static string Sign(int n) => n switch
+          {
+              int x => "number",
+              < 0 => "negative",
+          };
+        options:
+          - text: Compile error; the second arm is already handled by the first
+            correct: true
+            explanation: Error CS8510. int x matches every int, so the compiler knows < 0 can never be reached.
+          - text: Negative numbers return "negative" because that arm is more specific
+            misconception: switch-picks-most-specific
+            explanation: Arms are tried top to bottom and the first match wins; put specific arms first.
+          - text: It compiles, and negative numbers throw SwitchExpressionException
+            misconception: unreachable-arm-runtime
+            explanation: The compiler detects the unreachable arm before the program runs.
+        explanation: Order arms from most specific to least specific.
+        hint: Which arm does -5 match first?
+
+      - id: csharp.pattern-matching.mcq-non-exhaustive
+        type: mcq
+        prompt: A switch expression has arms for 1 and 2 only, with no discard, and it receives 3. What happens?
+        options:
+          - text: The compiler warned (CS8509) and at runtime it throws SwitchExpressionException
+            correct: true
+            explanation: A non-exhaustive switch expression compiles with a warning; an unmatched input throws.
+          - text: It returns default, such as null or 0
+            misconception: switch-returns-default
+            explanation: A switch expression must produce a value from an arm; with none matching it throws.
+          - text: It does not compile
+            misconception: non-exhaustive-is-error
+            explanation: Missing cases are a warning, not an error; treat the warning as a bug anyway.
+        explanation: End with _ => ... or throw a clear exception yourself.
+        hint: Is a missing case a warning or an error?
+
+      - id: csharp.pattern-matching.cloze-property-pattern
+        type: cloze
+        prompt: "Match an empty string with a property pattern: if (s is { ___: 0 })"
+        answers: ["Length"]
+        case_sensitive: true
+        explanation: "s is { Length: 0 } checks that s is not null and that its Length property is 0."
+        hint: The property that counts the characters.
+
+      - id: csharp.pattern-matching.code-describe
+        type: code
+        language: csharp
+        prompt: Strings fall into the discard arm. Add arms so an empty string prints "empty string" and any other string prints "string" and its length.
+        starter: |
+          object?[] values = [-5, 0, 42, "", "hello", 3.5, null];
+          foreach (var v in values) Console.WriteLine(Describe(v));
+
+          static string Describe(object? value) => value switch
+          {
+              null => "null",
+              int n when n < 0 => "negative",
+              int => "int",
+              _ => "other",
+          };
+        solution: |
+          object?[] values = [-5, 0, 42, "", "hello", 3.5, null];
+          foreach (var v in values) Console.WriteLine(Describe(v));
+
+          static string Describe(object? value) => value switch
+          {
+              null => "null",
+              int n when n < 0 => "negative",
+              int => "int",
+              string { Length: 0 } => "empty string",
+              string s => $"string {s.Length}",
+              _ => "other",
+          };
+        expected: |
+          negative
+          int
+          int
+          empty string
+          string 5
+          other
+          null
+        explanation: "Arms are tried top to bottom. The property pattern string { Length: 0 } must come before the general string s arm, or the compiler reports it as unreachable. A type pattern with a designation (string s) both tests and binds; _ catches the rest, here the double."
+        hint: A property pattern can test Length; put the specific arm first.
+
+  - id: csharp.generics
+    title: Generics and constraints
+    summary: >
+      Generic types and methods take type parameters, checked at compile
+      time and reified at runtime (List<int> stores ints without boxing).
+      Constraints (where T : ...) unlock members; default(T) is 0, false or
+      null. List<T> is invariant, IEnumerable<out T> is covariant, and arrays
+      are covariant with a runtime check.
+    level: intermediate
+    prereqs: [csharp.classes-records]
+    lesson:
+      intro: Generics let one piece of code work for many types while keeping full type checking. Constraints tell the compiler what T can do.
+      example:
+        lang: csharp
+        code: |
+          Console.WriteLine(Max(3, 8));
+          Console.WriteLine(Max("pear", "apple"));
+          Console.WriteLine(new Box<int>().Value);
+          Console.WriteLine(new Box<string>().Value is null);
+          IEnumerable<object> items = new List<string> { "a" };
+          Console.WriteLine(items.Count());
+
+          static T Max<T>(T a, T b) where T : IComparable<T> =>
+              a.CompareTo(b) >= 0 ? a : b;
+
+          class Box<T> { public T? Value { get; set; } }
+      steps:
+        - text: "The compiler infers T from the arguments (int, then string). where T : IComparable<T> is what makes a.CompareTo(b) legal; without it, T has only object's members. The lines print 8 and pear."
+        - text: A property that is never set holds default(T). For int that is 0; for string it is null.
+          predict:
+            prompt: What does new Box<int>().Value print?
+            options:
+              - text: "0"
+                correct: true
+              - text: An empty line, because T? makes it null
+                explanation: For an unconstrained T, T? on a value type is just T, so the default is 0, not null.
+        - text: .NET generics are reified. List<int> really stores ints with no boxing, and typeof(T) works at runtime, unlike Java's type erasure.
+        - text: IEnumerable<out T> is covariant, so a List<string> can be used as IEnumerable<object> and Count() prints 1. List<T> itself is invariant.
+          predict:
+            prompt: Would List<object> objs = new List<string>(); compile?
+            options:
+              - text: Yes, every string is an object
+                explanation: If it compiled, objs.Add(42) would put an int into a list of strings, so List<T> is invariant.
+              - text: No, List<T> is invariant
+                correct: true
+      takeaway: Constraints unlock members on T; default(T) depends on T; only interfaces and delegates marked out/in are variant.
+    items:
+      - id: csharp.generics.output-default
+        type: output
+        prompt: What does this print?
+        code: |
+          Console.WriteLine(Describe<int>());
+          Console.WriteLine(Describe<string>());
+          Console.WriteLine(Describe<bool>());
+
+          static string Describe<T>() => default(T) is null ? "null" : $"{default(T)}";
+        answers: ["0\nnull\nFalse"]
+        explanation: default(T) is the zero value of T; for reference types that is null.
+        hint: What is the zero value of bool?
+
+      - id: csharp.generics.output-array-covariance
+        type: output
+        prompt: What does this print?
+        code: |
+          object[] arr = new string[2];
+          arr[0] = "ok";
+          try { arr[1] = 42; Console.WriteLine("stored"); }
+          catch (ArrayTypeMismatchException) { Console.WriteLine("mismatch"); }
+        options:
+          - text: mismatch
+            correct: true
+            explanation: Arrays of reference types are covariant, so the runtime checks every store; an int cannot go into a string[].
+          - text: stored
+            misconception: array-covariance-safe
+            explanation: The array object is still a string[]; storing 42 fails the runtime type check.
+          - text: It does not compile
+            misconception: array-covariance-compile-error
+            explanation: object[] arr = new string[2] is legal (array covariance); the problem only shows up at runtime.
+        explanation: Array covariance is a legacy feature that costs a check per store; generic collections are invariant and safe at compile time.
+        hint: What is the real type of the array object?
+
+      - id: csharp.generics.mcq-invariance
+        type: mcq
+        prompt: Why does List<object> objs = new List<string>(); not compile?
+        options:
+          - text: List<T> is invariant; otherwise objs.Add(42) would put an int into a list of strings
+            correct: true
+            explanation: Only interfaces and delegates whose type parameter is marked out (or in) are variant, and List<T> lets you both read and write T.
+          - text: Because string is a value type
+            misconception: string-is-value-type
+            explanation: string is a reference type; the issue is variance, not value vs reference.
+          - text: It does compile, since every string is an object
+            misconception: generic-variance-automatic
+            explanation: Generic variance is opt-in. Use IEnumerable<object> objs = new List<string>(); for read-only access.
+        explanation: out T means T only comes out (IEnumerable<out T>); in T means it only goes in (IComparer<in T>).
+        hint: What would objs.Add(42) do to the list?
+
+      - id: csharp.generics.cloze-constraint
+        type: cloze
+        prompt: "Allow a.CompareTo(b) in a generic method: static T Max<T>(T a, T b) where T : ___<T>"
+        answers: ["IComparable"]
+        case_sensitive: true
+        explanation: "The constraint where T : IComparable<T> makes CompareTo available on values of type T."
+        hint: The interface whose method is CompareTo.
+
+      - id: csharp.generics.code-constraint
+        type: code
+        language: csharp
+        prompt: Max does not compile because T could be any type. Add the constraint that lets it call CompareTo.
+        starter: |
+          int[] numbers = [3, 9, 4];
+          string[] fruits = ["pear", "apple", "plum"];
+          Console.WriteLine(Max(numbers));
+          Console.WriteLine(Max(fruits));
+
+          static T Max<T>(IReadOnlyList<T> items)
+          {
+              T best = items[0];
+              foreach (var item in items)
+                  if (item.CompareTo(best) > 0) best = item;
+              return best;
+          }
+        solution: |
+          int[] numbers = [3, 9, 4];
+          string[] fruits = ["pear", "apple", "plum"];
+          Console.WriteLine(Max(numbers));
+          Console.WriteLine(Max(fruits));
+
+          static T Max<T>(IReadOnlyList<T> items) where T : IComparable<T>
+          {
+              T best = items[0];
+              foreach (var item in items)
+                  if (item.CompareTo(best) > 0) best = item;
+              return best;
+          }
+        expected: |
+          9
+          plum
+        explanation: "Inside a generic method the compiler only allows members it can prove T has. where T : IComparable<T> promises CompareTo, and int and string both satisfy it. Without it the compiler finds no CompareTo on T and may report the closest unrelated extension method it tried instead. Unlike Java, C# generics keep T at run time, so Max<int> works on unboxed ints."
+        hint: "where T : ..."
+
+  - id: csharp.delegates-lambdas
+    title: Delegates, lambdas and events
+    summary: >
+      Func and Action are delegate types; a lambda creates a delegate that
+      captures variables, not values. A for loop shares one variable across
+      iterations while foreach makes a new one each time. Delegates are
+      multicast, and an event exposes only += and -= to outside code.
+    level: intermediate
+    prereqs: [csharp.generics]
+    lesson:
+      intro: A delegate is a typed reference to a method. Lambdas are the short way to write one, and the variables they use are shared, not copied.
+      example:
+        lang: csharp
+        code: |
+          Func<int, int> square = x => x * x;
+          Action<string> log = msg => Console.WriteLine($"log: {msg}");
+          log(square(4).ToString());
+          var fromFor = new List<Action>();
+          for (var i = 0; i < 3; i++) fromFor.Add(() => Console.Write(i));
+          fromFor.ForEach(a => a());
+          Console.WriteLine();
+          var fromForeach = new List<Action>();
+          foreach (var j in new[] { 0, 1, 2 }) fromForeach.Add(() => Console.Write(j));
+          fromForeach.ForEach(a => a());
+          Console.WriteLine();
+          Action chain = () => Console.Write("A");
+          chain += () => Console.Write("B");
+          chain();
+      steps:
+        - text: 'Func<int, int> takes an int and returns an int; Action<string> returns nothing. log(square(4).ToString()) prints "log: 16".'
+        - text: The lambdas capture the variable i, not its value. A for loop has one i for the whole loop, and after the loop it is 3, so all three print 3.
+          predict:
+            prompt: What does the for-loop list print?
+            options:
+              - text: "012"
+                explanation: The lambdas read i when they run, after the loop has finished.
+              - text: "222"
+                explanation: The loop only stops when i < 3 is false, so i ends at 3.
+              - text: "333"
+                correct: true
+        - text: foreach declares a fresh j on every iteration (since C# 5), so each lambda gets its own variable and the line prints 012.
+        - text: Delegates are multicast. += appends a method to the invocation list and calling chain runs both in order, printing AB.
+        - text: An event (public event Action? Changed;) is a delegate that outside code can only += or -=. Only the declaring class can invoke it or reset it, usually with Changed?.Invoke().
+      takeaway: Lambdas capture variables (for shares one, foreach makes one per iteration); delegates are multicast; events limit outsiders to subscribe and unsubscribe.
+    items:
+      - id: csharp.delegates-lambdas.output-for-closure
+        type: output
+        prompt: What does this print?
+        code: |
+          var fs = new List<Func<int>>();
+          for (int i = 0; i < 3; i++) fs.Add(() => i * 10);
+          Console.WriteLine(string.Join(" ", fs.Select(f => f())));
+        options:
+          - text: 30 30 30
+            correct: true
+            explanation: All lambdas share the loop's single i, which is 3 once the loop ends.
+          - text: 0 10 20
+            misconception: closure-captures-value
+            explanation: Lambdas capture variables. Copy i into a local inside the loop body (var k = i;) to capture each value.
+          - text: 20 20 20
+            misconception: closure-sees-last-iteration
+            explanation: The loop exits only after i++ makes i equal 3, so the shared variable is 3, not 2.
+        explanation: With foreach, each iteration has its own variable and you would get 0 10 20.
+        hint: What is i after the loop condition fails?
+
+      - id: csharp.delegates-lambdas.output-multicast
+        type: output
+        prompt: What does this print?
+        code: |
+          Func<int> f = () => 1;
+          f += () => 2;
+          f += () => 3;
+          Console.WriteLine(f());
+          Action? a = () => Console.Write("x");
+          a += () => Console.Write("y");
+          a -= () => Console.Write("x");
+          a?.Invoke();
+        answers: ["3\nxy"]
+        explanation: A multicast Func runs every method and returns the last result. -= removes nothing here because the new lambda is a different method from the first one, even with the same body.
+        hint: Two lambdas with the same body are still two different methods.
+
+      - id: csharp.delegates-lambdas.mcq-event
+        type: mcq
+        prompt: Why declare public event EventHandler? Changed; instead of a public EventHandler? Changed field?
+        options:
+          - text: Outside code can only subscribe and unsubscribe; only the declaring class can raise or reset it
+            correct: true
+            explanation: With a plain field, any caller could invoke it or wipe every subscriber with Changed = null.
+          - text: Events run their handlers asynchronously on the thread pool
+            misconception: events-are-async
+            explanation: Raising an event calls each handler synchronously, in order, on the raising thread.
+          - text: An event can have only one subscriber
+            misconception: events-single-subscriber
+            explanation: Events are built on multicast delegates; any number of handlers can subscribe.
+        explanation: event is encapsulation for delegates, much like a property is for a field.
+        hint: What can a caller do to a public delegate field that it cannot do to an event?
+
+      - id: csharp.delegates-lambdas.cloze-safe-invoke
+        type: cloze
+        prompt: "Raise the event only when someone subscribed: Changed___Invoke(this, EventArgs.Empty);"
+        answers: ["?."]
+        explanation: Changed?.Invoke(...) reads the field once and calls it only when it is not null, which is also safe if a handler unsubscribes concurrently.
+        hint: The null-conditional operator.
+
+      - id: csharp.delegates-lambdas.code-multicast
+        type: code
+        language: csharp
+        prompt: Both handlers must run on a click, and each getter must return the index it was created with. Fix the subscription and the loop capture.
+        starter: |
+          var button = new Button();
+          button.Clicked = () => Console.WriteLine("log click");
+          button.Clicked = () => Console.WriteLine("save form");
+          button.Click();
+
+          List<Func<int>> getters = [];
+          for (int i = 0; i < 3; i++) getters.Add(() => i);
+          Console.WriteLine(string.Join(" ", getters.Select(g => g())));
+
+          class Button
+          {
+              public Action? Clicked;
+              public void Click() => Clicked?.Invoke();
+          }
+        solution: |
+          var button = new Button();
+          button.Clicked += () => Console.WriteLine("log click");
+          button.Clicked += () => Console.WriteLine("save form");
+          button.Click();
+
+          List<Func<int>> getters = [];
+          foreach (var i in Enumerable.Range(0, 3)) getters.Add(() => i);
+          Console.WriteLine(string.Join(" ", getters.Select(g => g())));
+
+          class Button
+          {
+              public event Action? Clicked;
+              public void Click() => Clicked?.Invoke();
+          }
+        expected: |
+          log click
+          save form
+          0 1 2
+        explanation: Delegates are multicast; += adds a handler while = replaces the whole list. Declaring the field as an event makes = a compile error outside the class. A for loop has one i shared by every lambda (3 when they run); a foreach variable is new each iteration, as is a local copy made inside the for body.
+        hint: Which operator adds a handler, and which loop gives each lambda its own variable?
+
+  - id: csharp.collections-linq
+    title: Collections and LINQ
+    summary: >
+      List<T>, Dictionary<TKey,TValue> and HashSet<T> are the workhorses.
+      LINQ queries such as Where and Select are lazy: they run when
+      enumerated, and again on every enumeration. ToList() takes a snapshot.
+      Modifying a List while iterating it with foreach throws.
+    level: intermediate
+    prereqs: [csharp.delegates-lambdas, logic.hashing]
+    lesson:
+      intro: Most LINQ operators build a recipe, not a result. Knowing when the recipe runs explains most LINQ bugs.
+      example:
+        lang: csharp
+        code: |
+          var nums = new List<int> { 1, 2, 3, 4 };
+          var calls = 0;
+          var evens = nums.Where(n => { calls++; return n % 2 == 0; });
+          Console.WriteLine(calls);
+          nums.Add(6);
+          Console.WriteLine(string.Join(",", evens));
+          Console.WriteLine(evens.Count());
+          Console.WriteLine(calls);
+          var ages = new Dictionary<string, int> { ["ana"] = 30 };
+          Console.WriteLine(ages.TryGetValue("bo", out var age) ? age : -1);
+          var groups = new[] { "a", "bb", "cc" }.GroupBy(w => w.Length);
+          foreach (var g in groups) Console.WriteLine($"{g.Key}: {string.Join(" ", g)}");
+      steps:
+        - text: Where returns a query object and runs no lambda yet (deferred execution), so calls is still 0.
+          predict:
+            prompt: What does the first WriteLine print?
+            options:
+              - text: "4"
+                explanation: Where has not looked at any element yet; it only runs when something enumerates it.
+              - text: "0"
+                correct: true
+        - text: string.Join enumerates the query now, so it sees the 6 added later and prints 2,4,6. Count() enumerates it again and prints 3.
+        - text: Each enumeration ran the lambda once per element (5 elements, twice), so calls is now 10. Call ToList() once when you need a fixed result or will enumerate several times.
+          predict:
+            prompt: What is calls at the end?
+            options:
+              - text: "5"
+                explanation: The query is not cached; Count() runs the filter over all five elements again.
+              - text: "10"
+                correct: true
+              - text: "3"
+                explanation: The lambda runs for every element it tests, not only for the ones it keeps.
+        - text: Dictionary lookups are O(1) on average. The indexer ages["bo"] would throw KeyNotFoundException; TryGetValue returns false instead, so the line prints -1.
+        - text: "GroupBy groups by a key and keeps the first-seen order: 1: a, then 2: bb cc."
+      takeaway: LINQ is lazy and re-runs on every enumeration; materialize with ToList(); use TryGetValue for keys that may be missing.
+    items:
+      - id: csharp.collections-linq.output-deferred
+        type: output
+        prompt: What does this print?
+        code: |
+          var list = new List<int> { 1, 2, 3 };
+          var doubled = list.Select(x => x * 2);
+          list.Add(10);
+          Console.WriteLine(string.Join(" ", doubled));
+        options:
+          - text: 2 4 6 20
+            correct: true
+            explanation: Select is deferred; it reads the list when string.Join enumerates it, after 10 was added.
+          - text: 2 4 6
+            misconception: linq-is-eager
+            explanation: Select does not compute anything when called; it runs on enumeration.
+          - text: InvalidOperationException (collection was modified)
+            misconception: modified-after-query
+            explanation: That exception happens only when the list changes during an enumeration; here the Add happens before any enumeration starts.
+        explanation: Use .ToList() right after the query to take a snapshot.
+        hint: When does Select actually run?
+
+      - id: csharp.collections-linq.mcq-dictionary-missing
+        type: mcq
+        prompt: d is an empty Dictionary<string, int>. What does var x = d["missing"]; do?
+        options:
+          - text: It throws KeyNotFoundException
+            correct: true
+            explanation: The indexer getter requires the key to exist; use TryGetValue or GetValueOrDefault.
+          - text: x is 0, the default for int
+            misconception: dictionary-returns-default
+            explanation: That is GetValueOrDefault("missing"); the indexer throws.
+          - text: It adds "missing" with value 0 and returns 0
+            misconception: dictionary-autovivify
+            explanation: Only assigning through the indexer (d["missing"] = 0) adds a key; reading never does.
+        explanation: Reading with the indexer is for keys you know exist.
+        hint: Is there a value to return?
+
+      - id: csharp.collections-linq.multi-constant-time
+        type: multi
+        prompt: Which operations are O(1) on average?
+        options:
+          - text: dict[key] on a Dictionary
+            correct: true
+            explanation: Dictionary is a hash table; lookups hash the key.
+          - text: set.Contains(x) on a HashSet
+            correct: true
+            explanation: HashSet is a hash table without values.
+          - text: list[i] on a List
+            correct: true
+            explanation: A List is backed by an array, so indexing is direct.
+          - text: list.Contains(x) on a List
+            misconception: list-contains-constant
+            explanation: List.Contains scans the elements, O(n). Use a HashSet for frequent membership tests.
+          - text: Lookup in a SortedDictionary
+            misconception: sorted-dictionary-is-hash
+            explanation: SortedDictionary is a balanced tree, so lookups are O(log n).
+        explanation: Pick the collection by its main operation.
+        hint: Which ones hash the key or index an array?
+
+      - id: csharp.collections-linq.bug-remove-in-foreach
+        type: bug
+        prompt: The stack trace reports InvalidOperationException ("Collection was modified") at the foreach. Which line causes it?
+        code: |
+          var scores = new List<int> { 50, 80, 30, 90 };
+          foreach (var s in scores)
+          {
+              if (s < 60)
+                  scores.Remove(s);
+          }
+          Console.WriteLine(scores.Count);
+        bug_line: 5
+        explanation: Changing a List during foreach invalidates its enumerator, and the next step throws. Use scores.RemoveAll(s => s < 60), or loop backwards with an index.
+        hint: What is the loop iterating over while the list changes?
+
+      - id: csharp.collections-linq.code-group-sum
+        type: code
+        language: csharp
+        prompt: Print each customer's total spend, biggest first, then the number of orders of 20 or more as they were before the late order arrived.
+        starter: |
+          var orders = new List<(string Customer, int Total)> { ("bo", 20), ("ana", 30), ("cy", 5), ("ana", 50) };
+
+          var totals = orders
+              .GroupBy(o => o.Customer)
+              .Select(g => $"{g.Key} {g.Count()}");
+          Console.WriteLine(string.Join(", ", totals));
+
+          var bigOrders = orders.Where(o => o.Total >= 20);
+          orders.Add(("dee", 99));
+          Console.WriteLine(bigOrders.Count());
+        solution: |
+          var orders = new List<(string Customer, int Total)> { ("bo", 20), ("ana", 30), ("cy", 5), ("ana", 50) };
+
+          var totals = orders
+              .GroupBy(o => o.Customer)
+              .OrderByDescending(g => g.Sum(o => o.Total))
+              .Select(g => $"{g.Key} {g.Sum(o => o.Total)}");
+          Console.WriteLine(string.Join(", ", totals));
+
+          var bigOrders = orders.Where(o => o.Total >= 20).ToList();
+          orders.Add(("dee", 99));
+          Console.WriteLine(bigOrders.Count);
+        expected: |
+          ana 80, bo 20, cy 5
+          3
+        explanation: GroupBy keeps groups in first-seen order; Sum adds the totals and OrderByDescending sorts by it. LINQ queries are deferred, so the starter's Where runs only when Count() is called, after the late order was added. ToList() runs the query at once and keeps the snapshot.
+        hint: Sum instead of Count, sort the groups, and materialize the filter before Add.
+
+  - id: csharp.exceptions-dispose
+    title: Exceptions, finally and using
+    summary: >
+      try/catch/finally handles failures; catch clauses can carry a when
+      filter; finally always runs. throw; rethrows keeping the stack trace.
+      using disposes IDisposable objects at the end of the scope, in reverse
+      order, even when an exception is thrown.
+    level: intermediate
+    prereqs: [csharp.classes-records]
+    lesson:
+      intro: Exceptions unwind the stack until a matching catch is found. using and finally make sure cleanup still happens on the way out.
+      example:
+        lang: csharp
+        code: |
+          try
+          {
+              using var a = new Res("a");
+              using var b = new Res("b");
+              Console.WriteLine("work");
+              throw new InvalidOperationException("boom");
+          }
+          catch (InvalidOperationException e) when (e.Message == "boom")
+          {
+              Console.WriteLine($"caught {e.Message}");
+          }
+          finally { Console.WriteLine("finally"); }
+
+          class Res(string name) : IDisposable { public void Dispose() => Console.WriteLine($"dispose {name}"); }
+      steps:
+        - text: A using declaration disposes the variable when the enclosing block ends. The compiler turns it into try/finally, so it also runs when an exception leaves the block.
+        - text: Disposal happens in reverse order of declaration, like a stack. After work, the exception makes the block exit, printing dispose b then dispose a.
+          predict:
+            prompt: In which order are the resources disposed?
+            options:
+              - text: dispose a, then dispose b
+                explanation: Later resources may depend on earlier ones, so they are disposed first.
+              - text: dispose b, then dispose a
+                correct: true
+              - text: They are not disposed, because an exception was thrown
+                explanation: using expands to try/finally, which runs on exceptions too.
+        - text: The when filter decides whether this catch handles the exception; if it is false, the exception keeps propagating as if the catch were not there. Here it matches and prints caught boom.
+        - text: finally runs last, whether the try succeeded, threw, or returned. The full output is work, dispose b, dispose a, caught boom, finally.
+        - text: To rethrow inside a catch, use throw; which keeps the original stack trace. throw e; restarts the trace at the catch and hides where the error happened.
+      takeaway: using = try/finally + Dispose in reverse order; filter with when; rethrow with throw; never throw e;.
+    items:
+      - id: csharp.exceptions-dispose.output-finally-return
+        type: output
+        prompt: What does this print?
+        code: |
+          Console.WriteLine(Run());
+
+          static int Run()
+          {
+              try { Console.WriteLine("try"); return 1; }
+              finally { Console.WriteLine("finally"); }
+          }
+        answers: ["try\nfinally\n1"]
+        explanation: return 1 sets the return value, then finally runs before the method actually returns; the caller prints 1 last.
+        hint: Does finally run when the try block returns?
+
+      - id: csharp.exceptions-dispose.mcq-using
+        type: mcq
+        prompt: "What does using var conn = OpenConnection(); guarantee?"
+        options:
+          - text: conn.Dispose() is called when the enclosing scope ends, even if an exception is thrown
+            correct: true
+            explanation: A using declaration is compiled to try/finally around the rest of the scope.
+          - text: The garbage collector frees conn's memory at the end of the scope
+            misconception: dispose-frees-memory
+            explanation: Dispose releases resources such as handles and connections; managed memory is still reclaimed by the GC later.
+          - text: Dispose is called only when the scope ends normally
+            misconception: using-skips-on-exception
+            explanation: The finally block runs on exceptions too; that is the point of using.
+        explanation: Use await using for IAsyncDisposable resources.
+        hint: What does the compiler turn using into?
+
+      - id: csharp.exceptions-dispose.bug-throw-ex
+        type: bug
+        prompt: The logs show a stack trace that starts in this catch block instead of where the failure happened. Which line is wrong?
+        code: |
+          try
+          {
+              ProcessOrder(order);
+          }
+          catch (Exception ex)
+          {
+              logger.LogError(ex, "processing failed");
+              throw ex;
+          }
+        bug_line: 8
+        explanation: throw ex; resets the exception's stack trace to this line. A bare throw; rethrows the same exception with its original trace.
+        hint: There are two ways to rethrow; only one keeps the trace.
+
+      - id: csharp.exceptions-dispose.cloze-when-filter
+        type: cloze
+        prompt: "Catch only 404 responses: catch (HttpRequestException e) ___ (e.StatusCode == HttpStatusCode.NotFound)"
+        answers: ["when"]
+        case_sensitive: true
+        explanation: An exception filter decides before the stack unwinds; when it is false, the exception keeps propagating untouched.
+        hint: The keyword that adds a condition to a catch.
+
+      - id: csharp.exceptions-dispose.code-using-var
+        type: code
+        language: csharp
+        prompt: When Use throws, nothing is disposed. Use using declarations so both resources are disposed, in reverse order, even on failure.
+        starter: |
+          Work(false);
+          try
+          {
+              Work(true);
+          }
+          catch (InvalidOperationException e)
+          {
+              Console.WriteLine($"caught {e.Message}");
+          }
+
+          static void Work(bool fail)
+          {
+              var log = new Resource("log");
+              var db = new Resource("db");
+              db.Use(fail);
+              db.Dispose();
+              log.Dispose();
+          }
+
+          sealed class Resource(string name) : IDisposable
+          {
+              public void Use(bool fail)
+              {
+                  if (fail) throw new InvalidOperationException($"{name} failed");
+                  Console.WriteLine($"use {name}");
+              }
+              public void Dispose() => Console.WriteLine($"dispose {name}");
+          }
+        solution: |
+          Work(false);
+          try
+          {
+              Work(true);
+          }
+          catch (InvalidOperationException e)
+          {
+              Console.WriteLine($"caught {e.Message}");
+          }
+
+          static void Work(bool fail)
+          {
+              using var log = new Resource("log");
+              using var db = new Resource("db");
+              db.Use(fail);
+          }
+
+          sealed class Resource(string name) : IDisposable
+          {
+              public void Use(bool fail)
+              {
+                  if (fail) throw new InvalidOperationException($"{name} failed");
+                  Console.WriteLine($"use {name}");
+              }
+              public void Dispose() => Console.WriteLine($"dispose {name}");
+          }
+        expected: |
+          use db
+          dispose db
+          dispose log
+          dispose db
+          dispose log
+          caught db failed
+        explanation: A using declaration disposes the variable when its scope ends, through a hidden try/finally, so it runs on an exception too and before the caller's catch. Several using declarations are disposed in reverse order of declaration.
+        hint: "using var x = ...;"
+
+  - id: csharp.async
+    title: async/await and Task
+    summary: >
+      An async method runs synchronously until its first await on an
+      unfinished task, then returns a Task to its caller. await does not
+      block the thread. Task.WhenAll overlaps waits; sequential awaits add
+      up. Avoid async void and .Result/.Wait().
+    level: advanced
+    prereqs: [csharp.delegates-lambdas, csharp.exceptions-dispose]
+    lesson:
+      intro: A Task represents work that finishes later. await pauses the method, not the thread, and resumes it when the task is done.
+      example:
+        lang: csharp
+        code: |
+          using System.Diagnostics;
+          var sw = Stopwatch.StartNew();
+          await Task.WhenAll(Work("a"), Work("b"));
+          Console.WriteLine($"together: {sw.ElapsedMilliseconds >= 600}");
+          sw.Restart();
+          await Work("c");
+          await Work("d");
+          Console.WriteLine($"one by one: {sw.ElapsedMilliseconds >= 600}");
+
+          static async Task Work(string name)
+          {
+              Console.WriteLine($"start {name}");
+              await Task.Delay(300);
+          }
+      steps:
+        - text: Work("a") runs synchronously up to its first await, so start a prints right away; then Work returns an unfinished Task and Work("b") starts.
+          predict:
+            prompt: What prints first?
+            options:
+              - text: start a, then start b
+                correct: true
+              - text: start a, then a 300 ms pause, then start b
+                explanation: Work("b") is called as soon as Work("a") returns its Task, before anyone awaits.
+        - text: Both delays run at the same time and WhenAll completes when the last one does, after about 300 ms, so together prints False (less than 600 ms).
+        - text: Awaiting one task before starting the next makes the waits add up to about 600 ms, so one by one prints True. start d only prints after c finishes.
+          predict:
+            prompt: When does start d print?
+            options:
+              - text: Right after start c
+                explanation: await Work("c") does not continue until c's Task completes.
+              - text: About 300 ms after start c
+                correct: true
+        - text: While a method awaits, its thread is free for other work. Blocking on a task with .Result or .Wait() holds the thread and can deadlock where a synchronization context (UI) must run the continuation.
+        - text: An exception inside an async Task method is stored in the Task and rethrown at await. In async void there is no Task to store it, so it crashes the process; use async void only for event handlers.
+      takeaway: Start tasks, then await them (WhenAll for many); never block with .Result; return Task, not void.
+    items:
+      - id: csharp.async.output-sync-until-await
+        type: output
+        prompt: What does this print?
+        code: |
+          var t = Run();
+          Console.WriteLine("after call");
+          await t;
+          Console.WriteLine("done");
+
+          static async Task Run()
+          {
+              Console.WriteLine("before await");
+              await Task.Delay(100);
+              Console.WriteLine("after await");
+          }
+        answers: ["before await\nafter call\nafter await\ndone"]
+        explanation: Run executes synchronously until await Task.Delay, then returns an unfinished Task. The caller prints after call, then awaits; Run resumes and prints after await.
+        hint: Which part of Run runs before it returns?
+
+      - id: csharp.async.mcq-whenall
+        type: mcq
+        prompt: About how long does await Task.WhenAll(Fetch(), Fetch(), Fetch()) take?
+        code: |
+          static async Task Fetch() => await Task.Delay(1000);
+        options:
+          - text: About 1 second
+            correct: true
+            explanation: The three tasks start when Fetch() is called and their delays overlap; WhenAll completes with the last one.
+          - text: About 3 seconds
+            misconception: whenall-sequential
+            explanation: That is what await Fetch(); three times in a row would take.
+          - text: It finishes immediately, because WhenAll does not wait
+            misconception: tasks-not-awaited
+            explanation: WhenAll returns a Task that completes when all of them do, and the code awaits it.
+        explanation: Start independent work first, then await it together.
+        hint: Do the delays overlap?
+
+      - id: csharp.async.bug-async-void
+        type: bug
+        prompt: The catch never runs and the process crashes with the IOException. Which line makes the exception impossible for any caller to catch?
+        code: |
+          try
+          {
+              SaveAsync();
+          }
+          catch (IOException e)
+          {
+              Console.WriteLine("save failed: " + e.Message);
+          }
+
+          static async void SaveAsync()
+          {
+              await Task.Delay(10);
+              throw new IOException("disk full");
+          }
+        bug_line: 10
+        explanation: async void returns no Task, so the exception has nowhere to go and is raised on the thread pool, which crashes the process. Return Task and await SaveAsync() on line 3.
+        hint: What does an async method return so its caller can observe failures?
+
+      - id: csharp.async.multi-blocking
+        type: multi
+        prompt: Which of these block the current thread until task finishes?
+        options:
+          - text: task.Result
+            correct: true
+            explanation: Reading Result on an unfinished task blocks the thread.
+          - text: task.Wait()
+            correct: true
+            explanation: Wait blocks until the task completes.
+          - text: task.GetAwaiter().GetResult()
+            correct: true
+            explanation: It blocks like Result, but rethrows the original exception instead of an AggregateException.
+          - text: await task
+            misconception: await-blocks-thread
+            explanation: await suspends the method and frees the thread; the rest of the method runs later as a continuation.
+          - text: Task.WhenAll(task, other)
+            misconception: whenall-blocks
+            explanation: WhenAll returns a new Task right away; only awaiting or blocking on it waits.
+        explanation: In async code, await all the way up; reserve blocking calls for places that cannot be async, like some Main or test setups.
+        hint: Which ones return control to the caller while waiting?
+
+      - id: csharp.async.code-when-all
+        type: code
+        language: csharp
+        prompt: Start the three loads concurrently and print their results, in id order, instead of the Task objects.
+        starter: |
+          string[] ids = ["1", "2", "3"];
+          var tasks = ids.Select(LoadAsync).ToList();
+          Console.WriteLine(string.Join(", ", tasks));
+
+          static async Task<string> LoadAsync(string id)
+          {
+              await Task.Yield();
+              return $"USER{id}";
+          }
+        solution: |
+          string[] ids = ["1", "2", "3"];
+          string[] names = await Task.WhenAll(ids.Select(LoadAsync));
+          Console.WriteLine(string.Join(", ", names));
+
+          static async Task<string> LoadAsync(string id)
+          {
+              await Task.Yield();
+              return $"USER{id}";
+          }
+        expected: |
+          USER1, USER2, USER3
+        explanation: Calling an async method starts it and returns a Task<string>, not a string; joining the tasks prints their type names. Task.WhenAll waits for every task and returns their results in the order of the input, whatever order they finish in. Top-level statements may use await directly.
+        hint: Which Task method awaits many tasks and returns all their results?
+
+  - id: csharp.span-memory
+    title: Span<T>, stackalloc and the GC
+    summary: >
+      Span<T> is a view over existing memory (array, string, stack) that
+      slices without copying. It is a ref struct, so it can only live on the
+      stack. The GC is generational: new objects start in gen 0 and
+      survivors are promoted; large objects go to the LOH.
+    level: advanced
+    prereqs: [csharp.value-reference, csharp.generics]
+    lesson:
+      intro: The cheapest allocation is the one you skip. Span<T> lets you read and write slices of existing memory without copying it.
+      example:
+        lang: csharp
+        code: |
+          int[] data = [10, 20, 30, 40, 50];
+          Span<int> middle = data.AsSpan(1, 3);
+          middle[0] = 99;
+          Console.WriteLine(string.Join(",", data));
+          ReadOnlySpan<char> text = "key=value";
+          int eq = text.IndexOf('=');
+          Console.WriteLine(text[(eq + 1)..].ToString());
+          Span<byte> buffer = stackalloc byte[4];
+          buffer.Fill(7);
+          Console.WriteLine(buffer.Length + buffer[3]);
+          Console.WriteLine(GC.GetGeneration(new object()));
+      steps:
+        - text: AsSpan(1, 3) is a view of elements 1 to 3 of the same array, not a copy. Writing middle[0] writes data[1].
+          predict:
+            prompt: What does the first WriteLine print?
+            options:
+              - text: 10,20,30,40,50
+                explanation: A span points into the array; nothing was copied, so the write is visible in data.
+              - text: 10,99,30,40,50
+                correct: true
+              - text: 99,20,30,40,50
+                explanation: The span starts at index 1, so middle[0] is data[1].
+        - text: Slicing a ReadOnlySpan<char> of a string allocates nothing; only the final ToString() creates a new string, value.
+        - text: stackalloc puts the 4 bytes on the stack; they disappear when the method returns, with no GC work. Length 4 plus buffer[3] = 7 prints 11.
+        - text: Span<T> is a ref struct. It may point to stack memory, so it can never reach the heap. It cannot be a field of a class, be boxed, be captured by a lambda or live across an await. Memory<T> is the heap-friendly version.
+          predict:
+            prompt: Can a class have a field of type Span<int>?
+            options:
+              - text: No, because Span is a ref struct and a class lives on the heap
+                correct: true
+              - text: Yes, if the field is readonly
+                explanation: readonly does not help; any ref struct field inside a class is an error.
+        - text: The GC is generational. A new object starts in generation 0 (so the last line prints 0); objects that survive a collection move to gen 1 and then gen 2. Objects of 85,000 bytes or more go straight to the large object heap. Fewer allocations mean fewer collections.
+      takeaway: Span slices memory without copying; it is stack-only; the GC collects young objects cheaply, so allocate less in hot paths.
+    items:
+      - id: csharp.span-memory.output-span-view
+        type: output
+        prompt: What does this print?
+        code: |
+          var arr = new[] { 1, 2, 3, 4 };
+          var span = arr.AsSpan()[1..3];
+          span.Reverse();
+          Console.WriteLine(string.Join(" ", arr));
+        options:
+          - text: 1 3 2 4
+            correct: true
+            explanation: The span covers indices 1 and 2 of arr; reversing it in place swaps those two elements of the array.
+          - text: 1 2 3 4
+            misconception: span-copies
+            explanation: A span is a view over the array, so changes through it change the array.
+          - text: 4 3 2 1
+            misconception: slice-ignored
+            explanation: The range 1..3 limits the span to two elements; only those are reversed.
+        explanation: Slicing a span is O(1) and allocation-free.
+        hint: Does [1..3] copy the elements?
+
+      - id: csharp.span-memory.mcq-ref-struct
+        type: mcq
+        prompt: Why does class Parser { private Span<char> buffer; } not compile?
+        options:
+          - text: Span<T> is a ref struct that may point to stack memory, so it cannot be stored inside a heap object
+            correct: true
+            explanation: Ref structs are stack-only. Store a Memory<char> or an array and create the span in the method that uses it.
+          - text: The field must be readonly
+            misconception: span-field-needs-readonly
+            explanation: readonly does not help; no class may hold a ref struct field.
+          - text: Span<T> requires an unsafe context
+            misconception: span-needs-unsafe
+            explanation: Span<T> is safe code; that is its main advantage over pointers.
+        explanation: Only a ref struct can hold a ref struct field.
+        hint: Where does a class instance live?
+
+      - id: csharp.span-memory.multi-gc
+        type: multi
+        prompt: Which statements about the .NET garbage collector are true?
+        options:
+          - text: New small objects are allocated in generation 0
+            correct: true
+            explanation: Gen 0 is collected often and cheaply because most objects die young.
+          - text: Objects that survive a collection are promoted to an older generation
+            correct: true
+            explanation: Survivors move from gen 0 to gen 1 to gen 2, which are collected less often.
+          - text: Objects of 85,000 bytes or more go to the large object heap
+            correct: true
+            explanation: The LOH is collected with gen 2 and is not compacted by default.
+          - text: Calling Dispose frees the object's managed memory immediately
+            misconception: dispose-frees-memory
+            explanation: Dispose releases resources like handles; the memory is reclaimed later by the GC.
+          - text: Value types always live on the stack
+            misconception: value-types-always-stack
+            explanation: A struct stored in an array, a class field or a boxed object lives on the heap with its container.
+        explanation: Where a value lives depends on its container, not just on whether it is a value type.
+        hint: Two of these confuse Dispose with memory, and value types with the stack.
+
+      - id: csharp.span-memory.cloze-stackalloc
+        type: cloze
+        prompt: "Allocate a 256-byte scratch buffer on the stack: Span<byte> buf = ___ byte[256];"
+        answers: ["stackalloc"]
+        case_sensitive: true
+        explanation: stackalloc in a Span<T> expression needs no unsafe code. Keep the size small and bounded to avoid stack overflow.
+        hint: The keyword allocates on the stack.
+
+      - id: csharp.span-memory.code-slice
+        type: code
+        language: csharp
+        prompt: Parse the number after = without allocating a substring. The value slice is off by one; fix its range.
+        starter: |
+          ReadOnlySpan<char> line = "width=120";
+          int eq = line.IndexOf('=');
+          ReadOnlySpan<char> key = line[..eq];
+          ReadOnlySpan<char> value = line[eq..];
+          Console.WriteLine($"{key.ToString()} {int.Parse(value) * 2}");
+
+          Span<int> buffer = stackalloc int[4];
+          for (int i = 0; i < buffer.Length; i++) buffer[i] = i * i;
+          Span<int> tail = buffer[2..];
+          tail[0] = 100;
+          Console.WriteLine(string.Join(" ", buffer.ToArray()));
+        solution: |
+          ReadOnlySpan<char> line = "width=120";
+          int eq = line.IndexOf('=');
+          ReadOnlySpan<char> key = line[..eq];
+          ReadOnlySpan<char> value = line[(eq + 1)..];
+          Console.WriteLine($"{key.ToString()} {int.Parse(value) * 2}");
+
+          Span<int> buffer = stackalloc int[4];
+          for (int i = 0; i < buffer.Length; i++) buffer[i] = i * i;
+          Span<int> tail = buffer[2..];
+          tail[0] = 100;
+          Console.WriteLine(string.Join(" ", buffer.ToArray()));
+        expected: |
+          width 240
+          0 1 100 9
+        explanation: A range start is inclusive, so line[eq..] still begins with = and int.Parse throws a FormatException. Slicing a span creates a view over the same memory, not a copy, so int.Parse reads the digits in place, and writing tail[0] changes buffer[2].
+        hint: "[a..b] includes index a."

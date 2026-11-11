@@ -1,0 +1,677 @@
+track:
+  id: typescript
+  title: TypeScript
+  description: TypeScript 5.x with strict mode — the type system, narrowing, generics, utility types and the async event loop.
+  order: 60
+
+concepts:
+  - id: typescript.types-basics
+    title: Types and runtime basics
+    summary: >
+      TypeScript types are erased at compile time; the runtime is JavaScript.
+      Prefer unknown over any, and remember JS quirks such as default sort.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: "TypeScript checks types at compile time, then erases them: the code that runs is plain JavaScript."
+      example:
+        lang: ts
+        code: |
+          const n: number = 42;
+          const raw: unknown = JSON.parse('{"port": 8080}');
+          if (typeof raw === "object" && raw !== null) {
+            if ("port" in raw) console.log(raw.port);
+          }
+      steps:
+        - text: "The annotation : number exists only for the checker. The emitted JavaScript is const n = 42; with no runtime check."
+          predict:
+            prompt: What does the first line become in the emitted JavaScript?
+            options:
+              - text: const n = 42;
+                correct: true
+              - text: "const n: number = 42;"
+                explanation: Type annotations are not JavaScript; the compiler removes them.
+              - text: A runtime check that n is a number
+                explanation: TypeScript adds no runtime checks; types are erased.
+        - text: JSON.parse returns any. Declaring raw as unknown means you must check it before you use it.
+        - text: "typeof, the null check and in narrow unknown step by step. Inside both ifs, raw.port is allowed and prints 8080."
+          predict:
+            prompt: Without the if checks, what would console.log(raw.port) do?
+            options:
+              - text: Compile and print 8080
+                explanation: That is what any would allow; unknown forces you to narrow first.
+              - text: "Fail to compile: raw is of type unknown"
+                correct: true
+              - text: Print undefined at runtime
+                explanation: The compiler stops you first; you cannot read properties of unknown.
+      takeaway: Types vanish at runtime; use unknown for untrusted data and narrow it before use.
+    items:
+      - id: typescript.types-basics.mcq-unknown-vs-any
+        type: mcq
+        prompt: "You parse JSON of unknown shape: const data: ??? = JSON.parse(body). Which type is safest?"
+        options:
+          - text: unknown — you must narrow it (typeof, in, a schema validator) before using it
+            correct: true
+            explanation: unknown accepts any value but allows no operations until it is narrowed.
+          - text: any
+            misconception: any-is-safe
+            explanation: any turns type checking off; data.foo.bar compiles and crashes at runtime.
+          - text: object
+            misconception: object-accepts-everything
+            explanation: JSON.parse can return strings, numbers, booleans and null, which are not object.
+        explanation: unknown is the type-safe top type; any is an escape hatch.
+        hint: Which type forces you to check before use?
+
+      - id: typescript.types-basics.output-default-sort
+        type: output
+        prompt: What does this print in Node.js?
+        code: |
+          const xs = [10, 1, 2];
+          xs.sort();
+          console.log(xs);
+        options:
+          - text: "[ 1, 10, 2 ]"
+            correct: true
+            explanation: Without a comparator, sort converts elements to strings and compares UTF-16 code units, so "10" < "2".
+          - text: "[ 1, 2, 10 ]"
+            misconception: sort-numeric-default
+            explanation: Numeric order needs a comparator, xs.sort((a, b) => a - b).
+          - text: "[ 10, 1, 2 ]"
+            misconception: sort-returns-copy
+            explanation: sort sorts in place (and returns the same array); toSorted() is the copying version.
+        explanation: The types say number[], but the runtime behavior is plain JavaScript.
+        hint: What does the default comparator convert elements to?
+
+      - id: typescript.types-basics.cloze-as-const
+        type: cloze
+        prompt: "Make every property readonly with literal types: const cfg = { mode: \"prod\", retries: 3 } ___ const;"
+        answers: ["as"]
+        explanation: "`as const` infers { readonly mode: \"prod\"; readonly retries: 3 } instead of { mode: string; retries: number }."
+        hint: It looks like a type assertion.
+
+      - id: typescript.types-basics.multi-erased
+        type: multi
+        prompt: Which TypeScript constructs disappear completely from the emitted JavaScript?
+        options:
+          - text: "Type annotations such as `: string`"
+            correct: true
+            explanation: They exist only for the checker.
+          - text: interface declarations
+            correct: true
+            explanation: Interfaces emit nothing, so you cannot check `x instanceof SomeInterface`.
+          - text: type aliases
+            correct: true
+            explanation: Like interfaces, they are compile-time only.
+          - text: enum declarations
+            misconception: enum-erased
+            explanation: Regular enums emit a runtime object (which is why erasableSyntaxOnly forbids them).
+          - text: class declarations
+            misconception: class-is-type-only
+            explanation: Classes are JavaScript values with runtime constructors.
+        explanation: Types cannot be inspected at runtime; validate external data with code (e.g. a schema library).
+        hint: Can you console.log it at runtime?
+
+      - id: typescript.types-basics.code-numeric-sort
+        type: code
+        language: typescript
+        prompt: Sort the scores from lowest to highest and print them joined by commas (9,10,25,100).
+        starter: |
+          const scores: number[] = [10, 9, 100, 25];
+          scores.sort();
+          console.log(scores.join(","));
+        solution: |
+          const scores: number[] = [10, 9, 100, 25];
+          scores.sort((a, b) => a - b);
+          console.log(scores.join(","));
+        expected: |
+          9,10,25,100
+        explanation: "The number[] annotation is erased before running; at runtime sort() with no comparator converts elements to strings and compares them, giving 10,100,25,9. A comparator (a, b) => a - b sorts by numeric value."
+        hint: Without a comparator, how does sort compare 100 and 25?
+
+  - id: typescript.narrowing
+    title: Narrowing and discriminated unions
+    summary: >
+      Control flow (typeof, in, ===, instanceof, user-defined type guards)
+      narrows union types. A shared literal "kind" field makes unions easy to
+      switch over exhaustively.
+    level: intermediate
+    prereqs: [typescript.types-basics]
+    lesson:
+      intro: A union type says a value is one of several shapes. Each check you write narrows the type inside the branch, and a shared literal field makes the check exact.
+      example:
+        lang: ts
+        code: |
+          type Result =
+            | { kind: "ok"; value: number }
+            | { kind: "error"; message: string };
+
+          function show(r: Result): string {
+            switch (r.kind) {
+              case "ok": return `ok ${r.value}`;
+              case "error": return `error ${r.message}`;
+              default: {
+                const unreachable: never = r;
+                return unreachable;
+              }
+            }
+          }
+      steps:
+        - text: "kind is the discriminant: a field with a different literal type in each member. Checking r.kind tells the compiler exactly which member r is."
+          predict:
+            prompt: "Inside case \"ok\", does r.message compile?"
+            options:
+              - text: Yes, message exists on Result
+                explanation: Only the error member has message; in this branch r is the ok member.
+              - text: No, r is narrowed to the ok member
+                correct: true
+        - text: "Other narrowing checks: typeof x === \"string\", \"key\" in x, x instanceof Date, Array.isArray(x), and x === null. Careful: typeof null is \"object\", so typeof x === \"object\" does not rule out null."
+        - text: "never is the type with no values. In default every member has been handled, so r is never and the assignment compiles. Add a { kind: \"wait\" } member and r is that member there instead, so the build fails until you add a case. A default that only throws would fail at runtime instead."
+          predict:
+            prompt: You add a third member to Result but no case for it. What happens?
+            options:
+              - text: The default branch returns undefined at runtime
+                explanation: The compiler stops first; the new member is not assignable to never.
+              - text: Nothing until that value shows up
+                explanation: The never assignment turns the missing case into a compile error.
+              - text: A compile error on the never assignment
+                correct: true
+        - text: "For checks of your own, write a type guard: a function whose return type is a type predicate, such as function isErr(r: Result): r is ErrorResult. When it returns true, the caller's r is narrowed."
+      takeaway: Narrow with typeof, in, instanceof or a kind field; assign to never in default to make a switch exhaustive.
+    items:
+      - id: typescript.narrowing.bug-typeof-null
+        type: bug
+        prompt: "With strictNullChecks, this fails to compile (\"x is possibly null\") and would crash on null. Which line is wrong?"
+        code: |
+          function len(x: string | string[] | null): number {
+            if (typeof x === "object") {
+              return x.length;
+            }
+            return x.length;
+          }
+        bug_line: 2
+        explanation: typeof null === "object", so the branch does not exclude null. Use Array.isArray(x), and handle null explicitly.
+        hint: What is typeof null in JavaScript?
+
+      - id: typescript.narrowing.cloze-type-predicate
+        type: cloze
+        prompt: "Write a user-defined type guard: function isFish(p: Fish | Bird): p ___ Fish { return \"swim\" in p; }"
+        answers: ["is"]
+        case_sensitive: true
+        explanation: A return type `p is Fish` tells the checker that a true result narrows p to Fish at the call site.
+        hint: The return type reads like an English sentence.
+
+      - id: typescript.narrowing.output-discriminated
+        type: output
+        prompt: What does this print?
+        code: |
+          type Shape =
+            | { kind: "circle"; r: number }
+            | { kind: "square"; s: number };
+          function area(sh: Shape): number {
+            switch (sh.kind) {
+              case "circle": return 3 * sh.r * sh.r;
+              case "square": return sh.s * sh.s;
+            }
+          }
+          console.log(area({ kind: "square", s: 3 }), area({ kind: "circle", r: 1 }));
+        answers: ["9 3"]
+        explanation: The kind literal narrows sh in each case; square 3·3 = 9, circle 3·1·1 = 3. console.log separates arguments with a space.
+        hint: Each case knows exactly which member it has.
+
+      - id: typescript.narrowing.mcq-exhaustive
+        type: mcq
+        prompt: How do you make the compiler fail when someone adds a new Shape kind but forgets to handle it in a switch?
+        options:
+          - text: "In the default branch, assign sh to a variable of type never: const _exhaustive: never = sh"
+            correct: true
+            explanation: If any member remains unhandled, sh is not never there and the assignment fails to compile.
+          - text: Add a default that throws an Error
+            misconception: runtime-check-is-compile-check
+            explanation: That only fails at runtime, after the bug ships.
+          - text: Mark the type as readonly
+            misconception: readonly-exhaustive
+            explanation: readonly prevents mutation; it has nothing to do with exhaustiveness.
+        explanation: The never trick turns "forgot a case" into a type error.
+        hint: Which type has no values at all?
+
+      - id: typescript.narrowing.code-exhaustive-area
+        type: code
+        language: typescript
+        prompt: Handle every Shape in area so it prints 3.14 then 6.00, and keep the never check for future kinds.
+        starter: |
+          type Shape =
+            | { kind: "circle"; r: number }
+            | { kind: "rect"; w: number; h: number };
+
+          function area(s: Shape): number {
+            switch (s.kind) {
+              case "circle":
+                return Math.PI * s.r ** 2;
+              default:
+                return 0;
+            }
+          }
+
+          const shapes: Shape[] = [{ kind: "circle", r: 1 }, { kind: "rect", w: 2, h: 3 }];
+          for (const s of shapes) console.log(area(s).toFixed(2));
+        solution: |
+          type Shape =
+            | { kind: "circle"; r: number }
+            | { kind: "rect"; w: number; h: number };
+
+          function area(s: Shape): number {
+            switch (s.kind) {
+              case "circle":
+                return Math.PI * s.r ** 2;
+              case "rect":
+                return s.w * s.h;
+              default: {
+                const unreachable: never = s;
+                throw new Error(`unknown shape ${JSON.stringify(unreachable)}`);
+              }
+            }
+          }
+
+          const shapes: Shape[] = [{ kind: "circle", r: 1 }, { kind: "rect", w: 2, h: 3 }];
+          for (const s of shapes) console.log(area(s).toFixed(2));
+        expected: |
+          3.14
+          6.00
+        explanation: "Switching on the shared kind field narrows s in each case, so s.w and s.h are allowed under \"rect\". A default that returns 0 silently hides missing cases; assigning s to never there makes the type checker reject the switch as soon as a new kind is added without a case."
+        hint: Which kind falls into default today?
+
+  - id: typescript.generics-utility
+    title: Generics and utility types
+    summary: >
+      Generics with constraints (K extends keyof T) keep types connected.
+      Built-in utility types — Partial, Pick, Omit, Record, ReturnType — derive
+      new types from existing ones.
+    level: intermediate
+    prereqs: [typescript.narrowing]
+    lesson:
+      intro: Generics let one function work for many types while keeping the relation between its inputs and output. Utility types build new types from existing ones.
+      example:
+        lang: ts
+        code: |
+          type User = { id: number; name: string;
+                        email: string };
+          function col<T, K extends keyof T>(
+            rows: T[], k: K,
+          ): T[K][] {
+            return rows.map((r) => r[k]);
+          }
+
+          const users: User[] = [
+            { id: 1, name: "Ana", email: "a@x" }];
+          const names = col(users, "name"); // string[]
+          type Patch = Partial<Omit<User, "id">>;
+      steps:
+        - text: "keyof User is the union \"id\" | \"name\" | \"email\". The constraint K extends keyof T means k must be one of those keys."
+          predict:
+            prompt: Does col(users, "mail") compile?
+            options:
+              - text: No, "mail" is not a key of User
+                correct: true
+              - text: Yes, any string is accepted
+                explanation: K is limited to keyof User by the extends constraint.
+        - text: "T[K] is an indexed access type: the type of property K of T. Both are inferred from the call, so col(users, \"name\") returns string[] and col(users, \"id\") returns number[]."
+        - text: "Object utilities: Partial<T> makes every key optional, Required<T> removes the ?, Readonly<T> adds readonly, Pick<T, K> keeps keys, Omit<T, K> drops them, Record<K, V> maps keys to V. Patch here is { name?: string; email?: string }."
+          predict:
+            prompt: Which value is not a valid Patch?
+            options:
+              - text: "{}"
+                explanation: Every key of Patch is optional, so an empty object is fine.
+              - text: "{ name: \"Bo\" }"
+                explanation: name is one of Patch's optional keys.
+              - text: "{ id: 2 }"
+                correct: true
+        - text: "These are mapped types over keyof T, so they work one level deep: Readonly and Partial do not touch nested objects. Union utilities are different: Exclude<U, X> and Extract<U, X> filter union members, and ReturnType<typeof fn> takes a function type."
+      takeaway: K extends keyof T plus T[K] keep keys and values linked; Pick and Omit pick object keys, Exclude and Extract filter unions, all shallow.
+    items:
+      - id: typescript.generics-utility.cloze-keyof
+        type: cloze
+        prompt: "Constrain K so getProp only accepts real keys of T."
+        code: |
+          function getProp<T, K ___ keyof T>(obj: T, key: K): T[K] {
+            return obj[key];
+          }
+        answers: ["extends"]
+        case_sensitive: true
+        explanation: K extends keyof T restricts key to T's property names and makes the return type the matching property type T[K].
+        hint: Generic constraints use the same keyword as class inheritance.
+
+      - id: typescript.generics-utility.mcq-pick
+        type: mcq
+        prompt: "type User = { id: number; name: string; email: string }. Which type is exactly { id: number }?"
+        options:
+          - text: Pick<User, "id">
+            correct: true
+            explanation: Pick keeps only the listed keys.
+          - text: Partial<User>
+            misconception: partial-removes-keys
+            explanation: Partial keeps every key and makes them all optional.
+          - text: Exclude<User, "name" | "email">
+            misconception: exclude-on-objects
+            explanation: Exclude filters members of a union type; for object keys use Omit<User, "name" | "email">.
+        explanation: Pick and Omit select keys of object types; Extract and Exclude filter unions.
+        hint: You want to select one key.
+
+      - id: typescript.generics-utility.multi-utility
+        type: multi
+        prompt: Which statements about TypeScript utility types are true?
+        options:
+          - text: Readonly<T> is shallow — nested objects stay mutable
+            correct: true
+            explanation: It only adds readonly to T's own properties.
+          - text: Required<T> removes the ? modifier from every property
+            correct: true
+            explanation: It is the opposite of Partial.
+          - text: ReturnType<typeof fn> is the type fn returns
+            correct: true
+            explanation: It takes a function type, hence the typeof.
+          - text: Partial<T> makes nested properties optional too
+            misconception: utility-types-deep
+            explanation: Partial is shallow as well; deep versions must be written with recursive mapped types.
+        explanation: Built-in mapped utility types operate on one level only.
+        hint: Mapped types iterate over keyof T — only the top-level keys.
+
+      - id: typescript.generics-utility.parsons-group-by
+        type: parsons
+        prompt: Order the lines of a generic groupBy.
+        lines:
+          - "function groupBy<T, K extends PropertyKey>("
+          - "  items: T[],"
+          - "  key: (item: T) => K,"
+          - "): Record<K, T[]> {"
+          - "  const out = {} as Record<K, T[]>;"
+          - "  for (const item of items) {"
+          - "    (out[key(item)] ??= []).push(item);"
+          - "  }"
+          - "  return out;"
+          - "}"
+        explanation: "Signature (type parameters, parameters, return type), then build the record; ??= creates the bucket on first use. (ES2024 also ships Object.groupBy.)"
+        hint: The parameters come before the return type.
+
+      - id: typescript.generics-utility.code-partial-update
+        type: code
+        language: typescript
+        prompt: update applies a Partial patch on top of obj. Fix it so Ana's age becomes 31 and the keys keep obj's order.
+        starter: |
+          type User = { name: string; age: number; email: string };
+
+          function update<T extends object>(obj: T, patch: Partial<T>): T {
+            return { ...patch, ...obj };
+          }
+
+          const ana: User = { name: "Ana", age: 30, email: "ana@x.io" };
+          console.log(JSON.stringify(update(ana, { age: 31 })));
+        solution: |
+          type User = { name: string; age: number; email: string };
+
+          function update<T extends object>(obj: T, patch: Partial<T>): T {
+            return { ...obj, ...patch };
+          }
+
+          const ana: User = { name: "Ana", age: 30, email: "ana@x.io" };
+          console.log(JSON.stringify(update(ana, { age: 31 })));
+        expected: |
+          {"name":"Ana","age":31,"email":"ana@x.io"}
+        explanation: Partial<T> makes every key of T optional, so the patch may carry any subset with the right types. In an object spread later properties win; spreading obj last puts the old age back (and puts age first). Spread obj, then patch.
+        hint: In { ...x, ...y }, which side wins a shared key?
+
+  - id: typescript.async
+    title: Promises and the event loop
+    summary: >
+      Synchronous code runs first, then microtasks (promise callbacks), then
+      macrotasks (timers). async/await is sugar over promises.
+    level: intermediate
+    prereqs: [typescript.types-basics]
+    lesson:
+      intro: "JavaScript runs on one thread with an event loop: run the current script to the end, then all pending microtasks, then the next macrotask."
+      example:
+        lang: ts
+        code: |
+          console.log("sync 1");
+          setTimeout(() => console.log("timer"), 0);
+          Promise.resolve().then(() => console.log("micro"));
+          console.log("sync 2");
+
+          const ok = Promise.resolve(1);
+          const bad = Promise.reject(new Error("b"));
+          const s = await Promise.allSettled([ok, bad]);
+          console.log(s.map((r) => r.status));
+      steps:
+        - text: Synchronous code always finishes first, so sync 1 and sync 2 print before any callback. setTimeout(…, 0) queues a macrotask; .then queues a microtask.
+        - text: When the stack empties, the loop drains every microtask (promise callbacks, code after an await) before it takes the next macrotask (timers, I/O).
+          predict:
+            prompt: In which order do the first four lines print?
+            options:
+              - text: sync 1, timer, micro, sync 2
+                explanation: Callbacks never interrupt synchronous code; sync 2 prints before either.
+              - text: sync 1, sync 2, micro, timer
+                correct: true
+              - text: sync 1, sync 2, timer, micro
+                explanation: Microtasks drain before the next macrotask, and a timer is a macrotask.
+        - text: "async/await is sugar over promises: an async function returns a promise, and await pauses only that function, resuming as a microtask. arr.forEach(async …) ignores the returned promises, so nothing waits; use for … of with await, or await Promise.all(arr.map(…))."
+        - text: "Promise.allSettled waits for all and reports each status, here [\"fulfilled\", \"rejected\"]. Promise.all is fail-fast. any resolves with the first success; race settles with the first result of any kind."
+          predict:
+            prompt: "Instead, await Promise.all([ok, bad]): what happens?"
+            options:
+              - text: It rejects with the error "b"
+                correct: true
+              - text: It resolves with [1]
+                explanation: Promise.all never drops failures; that partial view comes from allSettled.
+        - text: A rejection does not cancel the other promises; they keep running and their results are ignored. To abort work such as fetch, pass an AbortController's signal.
+      takeaway: Sync code, then microtasks (promises), then macrotasks (timers); Promise.all fails fast, allSettled reports every outcome.
+    items:
+      - id: typescript.async.output-event-loop
+        type: output
+        prompt: What does this print?
+        code: |
+          console.log("A");
+          setTimeout(() => console.log("B"), 0);
+          Promise.resolve().then(() => console.log("C"));
+          console.log("D");
+        answers: ["A\nD\nC\nB"]
+        explanation: A and D are synchronous. Then the microtask queue (C) drains before the next macrotask, the 0 ms timer (B).
+        hint: Promises are microtasks; timers are macrotasks.
+
+      - id: typescript.async.bug-foreach-async
+        type: bug
+        prompt: "\"all saved\" is logged before the saves finish. Which line is wrong?"
+        code: |
+          async function saveAll(users: User[]): Promise<void> {
+            users.forEach(async (u) => {
+              await db.save(u);
+            });
+            console.log("all saved");
+          }
+        bug_line: 2
+        explanation: forEach ignores the promises its callback returns. Use `for (const u of users) await db.save(u)` or `await Promise.all(users.map((u) => db.save(u)))`.
+        hint: Does forEach wait for anything?
+
+      - id: typescript.async.mcq-all-vs-settled
+        type: mcq
+        prompt: You call three APIs with Promise.all and the second one rejects. What happens?
+        options:
+          - text: Promise.all rejects with that error as soon as it happens; the other calls keep running but their results are ignored
+            correct: true
+            explanation: all is fail-fast. Use Promise.allSettled to get every outcome.
+          - text: Promise.all waits for all three and returns the two successes
+            misconception: all-collects-partial
+            explanation: That is Promise.allSettled (which reports statuses).
+          - text: The other two requests are cancelled
+            misconception: promise-cancels
+            explanation: Promises cannot be cancelled; use an AbortController to abort fetches.
+        explanation: "all: fail-fast; allSettled: every result; any: first success; race: first settlement."
+        hint: Is Promise.all fail-fast?
+
+      - id: typescript.async.code-await-all
+        type: code
+        language: typescript
+        prompt: total should wait for every price before summing. Make it print 70.
+        starter: |
+          async function price(item: string): Promise<number> {
+            return item.length * 10;
+          }
+
+          async function total(items: string[]): Promise<number> {
+            let sum = 0;
+            items.forEach(async (item) => {
+              sum += await price(item);
+            });
+            return sum;
+          }
+
+          total(["pen", "book"]).then((t) => console.log(t));
+        solution: |
+          async function price(item: string): Promise<number> {
+            return item.length * 10;
+          }
+
+          async function total(items: string[]): Promise<number> {
+            const prices = await Promise.all(items.map(price));
+            return prices.reduce((sum, p) => sum + p, 0);
+          }
+
+          total(["pen", "book"]).then((t) => console.log(t));
+        expected: |
+          70
+        explanation: forEach ignores the promises its async callback returns. Each callback pauses at await and resumes in a later microtask, but total has already returned sum while it was still 0. Promise.all waits for every price; a for...of loop with await would work too.
+        hint: Does forEach wait for an async callback?
+
+  - id: typescript.advanced-types
+    title: Advanced types
+    summary: >
+      Conditional types (T extends U ? X : Y) distribute over unions and can
+      infer parts of types; satisfies checks a value against a type without
+      widening it.
+    level: advanced
+    prereqs: [typescript.generics-utility]
+    lesson:
+      intro: Conditional types compute a type from another type, like a ternary at the type level. satisfies checks a value without changing its inferred type.
+      example:
+        lang: ts
+        code: |
+          type IsStr<T> = T extends string ? "yes" : "no";
+          type A = IsStr<"x" | 1>;
+          type Unwrap<T> =
+            T extends Promise<infer U> ? U : T;
+          type B = Unwrap<Promise<number>>;
+
+          const theme = {
+            fg: "#fff",
+            bg: "#000",
+          } satisfies Record<string, string>;
+          theme.fg.toUpperCase();
+      steps:
+        - text: "T extends U ? X : Y picks X when T is assignable to U, otherwise Y."
+        - text: When T is a bare type parameter and you pass a union, the conditional runs once per member and the results are joined again. never members vanish from a union. Wrap both sides, [T] extends [string], to turn this off.
+          predict:
+            prompt: What is A, i.e. IsStr<"x" | 1>?
+            options:
+              - text: "\"no\""
+                explanation: The union is not checked as a whole; each member is checked on its own.
+              - text: "\"yes\" | \"no\""
+                correct: true
+              - text: "\"yes\""
+                explanation: The member 1 is not a string, so it maps to "no".
+        - text: infer U declares a type variable inside the extends clause, and TypeScript fills it in when the pattern matches. B is number. ReturnType and Awaited are built the same way.
+        - text: "satisfies (TS 4.9+) checks that theme fits Record<string, string>, yet theme keeps its inferred type { fg: string; bg: string }. With the annotation const theme: Record<string, string>, every string key would be allowed."
+          predict:
+            prompt: Does theme.border compile with satisfies?
+            options:
+              - text: No, theme only has fg and bg
+                correct: true
+              - text: Yes, as string, because of Record<string, string>
+                explanation: That is what an annotation would give; satisfies keeps the literal keys.
+              - text: Yes, but it is undefined at runtime
+                explanation: The compiler rejects it before it runs.
+        - text: Like all type syntax, satisfies, conditional types and infer are erased; they never change the JavaScript that runs.
+      takeaway: Conditional types distribute over unions; infer pulls out parts of a type; satisfies validates and keeps precise types.
+    items:
+      - id: typescript.advanced-types.mcq-satisfies
+        type: mcq
+        prompt: "What does `satisfies` give you here compared to annotating routes: Record<string, string>?"
+        code: |
+          const routes = {
+            home: "/",
+            user: "/users/:id",
+          } satisfies Record<string, string>;
+          routes.about; // ?
+        options:
+          - text: The value is checked against the type, but routes keeps its inferred type, so routes.about is a compile error
+            correct: true
+            explanation: satisfies validates without replacing the inferred type; the known keys survive.
+          - text: Nothing; satisfies is just an alias for a type annotation
+            misconception: satisfies-is-annotation
+            explanation: With the annotation, routes.about would compile as string because every key is allowed.
+          - text: It converts the object to a Map at runtime
+            misconception: types-affect-runtime
+            explanation: Like all type syntax, satisfies is erased.
+        explanation: satisfies (TS 4.9+) is the way to validate config objects while keeping precise types.
+        hint: With Record<string, string>, which keys does the checker allow?
+
+      - id: typescript.advanced-types.cloze-infer
+        type: cloze
+        prompt: "Extract the element type of an array type: type ElementOf<T> = T extends (___ U)[] ? U : never;"
+        answers: ["infer"]
+        case_sensitive: true
+        explanation: infer declares a type variable inside the extends clause that TypeScript fills in when the match succeeds; ElementOf<string[]> is string.
+        hint: You want TypeScript to infer U.
+
+      - id: typescript.advanced-types.mcq-distributive
+        type: mcq
+        prompt: "What is Exclude<\"a\" | \"b\" | \"c\", \"a\">? (type Exclude<T, U> = T extends U ? never : T)"
+        options:
+          - text: "\"b\" | \"c\""
+            correct: true
+            explanation: The conditional distributes over each union member; "a" maps to never, which disappears from the union.
+          - text: never
+            misconception: exclude-removes-all
+            explanation: Only members assignable to "a" become never; "b" and "c" are not assignable to "a", so they are kept.
+          - text: "\"a\""
+            misconception: exclude-is-extract
+            explanation: That is Extract, which keeps the matching members.
+        explanation: Conditional types on a naked type parameter are distributive over unions.
+        hint: Evaluate the conditional once per member.
+
+      - id: typescript.advanced-types.code-unwrap-infer
+        type: code
+        language: typescript
+        prompt: "ElementOf<T> infers an array's element type. Make unwrap match it at runtime: the first element for arrays, the value itself otherwise."
+        starter: |
+          type ElementOf<T> = T extends readonly (infer U)[] ? U : T;
+
+          function unwrap<T>(value: T): ElementOf<T> {
+            return value as ElementOf<T>;
+          }
+
+          const routes = {
+            home: "/",
+            user: ["/users", "/u"],
+          } satisfies Record<string, string | string[]>;
+
+          for (const [name, path] of Object.entries(routes)) {
+            console.log(`${name} -> ${unwrap(path)}`);
+          }
+        solution: |
+          type ElementOf<T> = T extends readonly (infer U)[] ? U : T;
+
+          function unwrap<T>(value: T): ElementOf<T> {
+            return (Array.isArray(value) ? value[0] : value) as ElementOf<T>;
+          }
+
+          const routes = {
+            home: "/",
+            user: ["/users", "/u"],
+          } satisfies Record<string, string | string[]>;
+
+          for (const [name, path] of Object.entries(routes)) {
+            console.log(`${name} -> ${unwrap(path)}`);
+          }
+        expected: |
+          home -> /
+          user -> /users
+        explanation: "Types are erased, so the cast `as ElementOf<T>` changes nothing at runtime: the starter prints the whole array (/users,/u). The conditional type only describes the result; the code must do the same check with Array.isArray. satisfies verifies routes without widening it, so routes.user stays string[]."
+        hint: What does a type assertion do when the program runs?

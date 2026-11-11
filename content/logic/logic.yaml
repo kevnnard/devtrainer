@@ -1,0 +1,919 @@
+track:
+  id: logic
+  title: Logic & algorithms
+  description: Complexity, hashing, two pointers, recursion, binary search and sorting — the core of coding interviews. Snippets are Python 3.12+.
+  order: 10
+
+concepts:
+  - id: logic.big-o
+    title: Big-O complexity
+    summary: >
+      Big-O describes how the running time or memory of an algorithm grows with
+      the input size n, ignoring constants and lower-order terms.
+    level: beginner
+    lesson:
+      intro: Big-O counts how the number of steps grows with the input size n. Count the work, then keep only the fastest-growing term.
+      example:
+        lang: python
+        code: |
+          def has_duplicate(xs):
+              for i in range(len(xs)):
+                  for j in range(i + 1, len(xs)):
+                      if xs[i] == xs[j]:
+                          return True
+              return False
+      steps:
+        - text: The outer loop runs n times, once per element of xs.
+        - text: "For each i the inner loop visits every j after i: n-1 comparisons, then n-2, and so on down to 0."
+          predict:
+            prompt: For one value of i, how many times can the inner loop run?
+            options:
+              - text: Up to about n times (n - i - 1)
+                correct: true
+              - text: Once
+                explanation: It loops over every j after i, not just the next one.
+              - text: About log n times
+                explanation: Nothing halves the range; j moves one step at a time.
+        - text: "In total that is n(n-1)/2 comparisons. Drop the constant 1/2 and the lower term n: O(n²)."
+          predict:
+            prompt: So what is the worst-case time complexity?
+            options:
+              - text: O(n²/2)
+                explanation: Big-O drops constant factors, so n²/2 is written O(n²).
+              - text: O(n²)
+                correct: true
+              - text: O(n)
+                explanation: Nested loops multiply their counts; about n·n/2 comparisons run.
+        - text: The early return True only helps the best case. Big-O usually describes the worst case, here a list with no duplicate.
+      takeaway: Nested loops over the same input multiply to O(n²); constants and lower-order terms drop.
+    items:
+      - id: logic.big-o.mcq-nested-loops
+        type: mcq
+        prompt: What is the time complexity of this function for a list of length n?
+        code: |
+          def pairs(xs):
+              count = 0
+              for a in xs:
+                  for b in xs:
+                      if a < b:
+                          count += 1
+              return count
+        options:
+          - text: O(n²)
+            correct: true
+            explanation: The inner loop runs n times for each of the n outer iterations, n·n comparisons.
+          - text: O(n)
+            misconception: nested-loops-add
+            explanation: Nested loops multiply their iteration counts; they only add when they run one after the other.
+          - text: O(n log n)
+            misconception: condition-reduces-complexity
+            explanation: The `if` filters what is counted, not how many comparisons run; every pair is still visited.
+          - text: O(1)
+            misconception: constant-because-no-recursion
+            explanation: Loops over the input make the cost grow with n even without recursion.
+        explanation: Two nested loops over the same n-element input cost O(n²); constants such as "only half the pairs" do not change the class.
+        hint: Count how many times the innermost line runs as a function of n.
+
+      - id: logic.big-o.output-doubling
+        type: output
+        prompt: What does this print?
+        code: |
+          count = 0
+          i = 1
+          while i < 64:
+              i *= 2
+              count += 1
+          print(count)
+        answers: ["6"]
+        explanation: i goes 1→2→4→8→16→32→64, six doublings. A loop whose variable doubles runs log₂(n) times, so it is O(log n).
+        hint: Write down the value of i after each iteration.
+
+      - id: logic.big-o.multi-constant-time
+        type: multi
+        prompt: Which Python operations are O(1) on average (amortized where it applies)?
+        options:
+          - text: Looking up a key in a dict
+            correct: true
+            explanation: Dicts are hash tables; lookups hash the key and jump to its bucket.
+          - text: Appending to the end of a list with append()
+            correct: true
+            explanation: The list over-allocates, so resizes are rare; the amortized cost per append is O(1).
+          - text: Checking `x in some_list`
+            misconception: in-list-is-constant
+            explanation: Membership in a list scans elements one by one, O(n). Use a set or dict for O(1) membership.
+          - text: Inserting at the front with lst.insert(0, x)
+            misconception: insert-front-is-constant
+            explanation: Every existing element must shift one slot right, O(n). Use collections.deque for O(1) appends on both ends.
+          - text: Sorting a list with sorted()
+            misconception: builtin-means-constant
+            explanation: Being built in does not make it free; comparison sorting is O(n log n).
+        explanation: Hash-based lookups and amortized appends are O(1); scanning, shifting and sorting grow with n.
+        hint: Ask whether the operation has to touch every element.
+
+      - id: logic.big-o.cloze-binary-search
+        type: cloze
+        prompt: "Binary search over n sorted elements halves the range each step, so it runs in O(___) time."
+        answers: ["log n", "logn", "lg n", "log(n)", "log2 n", "log2(n)"]
+        explanation: After k halvings the range is n/2^k; it reaches 1 when k = log₂ n.
+        hint: How many times can you halve n before reaching 1?
+
+      - id: logic.big-o.code-count-pairs
+        type: code
+        language: python
+        prompt: "pairs(n) counts the steps of a loop that visits each pair i < j of n items exactly once. Fix the inner loop so it prints 6, 45 and 4950 for n = 4, 10, 100."
+        starter: |
+          def pairs(n):
+              steps = 0
+              for i in range(n):
+                  for j in range(n):
+                      steps += 1
+              return steps
+
+          for n in (4, 10, 100):
+              print(pairs(n))
+        solution: |
+          def pairs(n):
+              steps = 0
+              for i in range(n):
+                  for j in range(i + 1, n):
+                      steps += 1
+              return steps
+
+          for n in (4, 10, 100):
+              print(pairs(n))
+        expected: |
+          6
+          45
+          4950
+        explanation: "The starter visits all n² ordered pairs (16, 100, 10000), including i == j and each pair twice. Starting j at i + 1 visits n(n-1)/2 pairs. That is half the work, but still O(n²): dropping the constant 1/2 and the lower-order -n/2 leaves n²."
+        hint: Which j values make a pair with i that you have not seen yet?
+
+  - id: logic.hashing
+    title: Hashing and lookup tables
+    summary: >
+      Sets and dicts trade memory for O(1) average lookups, turning many
+      O(n²) "compare every pair" solutions into a single O(n) pass.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: Comparing every pair is O(n²). A set or dict remembers what you have already seen, so each new element needs one O(1) lookup instead of a scan.
+      example:
+        lang: python
+        code: |
+          def first_repeat(xs):
+              seen = set()
+              for x in xs:
+                  if x in seen:
+                      return x
+                  seen.add(x)
+              return None
+
+          print(first_repeat([4, 1, 7, 1, 4]))
+      steps:
+        - text: "seen holds every value already passed. x in seen hashes x and jumps to its bucket: O(1) on average, where x in some_list would scan the whole list."
+        - text: The loop sees 4, 1, 7, then 1 again, which is already in seen. It returns 1 before it ever reaches the second 4. One pass, O(n) time, O(n) extra memory.
+          predict:
+            prompt: What does first_repeat([4, 1, 7, 1, 4]) return?
+            options:
+              - text: "4"
+                explanation: 4 repeats too, but its second copy comes after the second 1, and the function returns at the first repeat it meets.
+              - text: "1"
+                correct: true
+              - text: None
+                explanation: Two values repeat, so the loop returns before it falls through to None.
+        - text: The check comes before the insert. If seen.add(x) ran first, x in seen would always be true and every element would "repeat" itself — the function would return the very first element.
+          predict:
+            prompt: If seen.add(x) moved above the if, what would first_repeat([4, 1, 7]) return?
+            options:
+              - text: "4"
+                correct: true
+              - text: None
+                explanation: After adding x, x in seen is true at once, so the first element matches itself.
+        - text: "A dict does the same lookup but also stores a value per key: map each value to its index, or count with d[k] = d.get(k, 0) + 1. Dicts keep keys in insertion order."
+      takeaway: "A set or dict turns \"have I seen this?\" into an O(1) lookup: check first, then store."
+    items:
+      - id: logic.hashing.mcq-two-sum
+        type: mcq
+        prompt: Given an unsorted list and a target, you must return the indices of two numbers that add up to the target. Which approach is optimal in time?
+        options:
+          - text: One pass with a dict mapping each seen value to its index, checking target - x before storing x
+            correct: true
+            explanation: Each element does one O(1) lookup and one O(1) insert, O(n) total.
+          - text: Two nested loops over every pair
+            misconception: brute-force-is-fine
+            explanation: Correct but O(n²); interviews expect you to trade memory for time.
+          - text: Sort, then binary search each complement
+            misconception: sorting-keeps-indices
+            explanation: O(n log n) and sorting loses the original indices unless you carry them along; slower than the hash approach.
+        explanation: The complement trick — "have I already seen target - x?" — is the canonical hashing pattern.
+        hint: What do you need to remember about the elements you have already passed?
+
+      - id: logic.hashing.output-char-count
+        type: output
+        prompt: What does this print?
+        code: |
+          counts = {}
+          for ch in "banana":
+              counts[ch] = counts.get(ch, 0) + 1
+          print(counts)
+        options:
+          - text: "{'b': 1, 'a': 3, 'n': 2}"
+            correct: true
+            explanation: Dicts keep insertion order (guaranteed since Python 3.7), so keys appear in first-seen order b, a, n.
+          - text: "{'a': 3, 'b': 1, 'n': 2}"
+            misconception: dict-sorted-keys
+            explanation: Dicts are not sorted by key; they preserve insertion order.
+          - text: "{'b': 1, 'a': 1, 'n': 1}"
+            misconception: get-default-overwrites
+            explanation: counts.get(ch, 0) returns the current count when the key exists, so counts accumulate.
+          - text: A KeyError
+            misconception: get-raises-keyerror
+            explanation: dict.get returns the default instead of raising; only counts[ch] on a missing key raises.
+        explanation: get(key, default) plus insertion order makes this the standard frequency-count idiom (collections.Counter does the same).
+        hint: Which letter of "banana" is seen first?
+
+      - id: logic.hashing.bug-two-sum
+        type: bug
+        prompt: "This two-sum returns [0, 0] for nums=[3], target=6. Which line is wrong?"
+        code: |
+          def two_sum(nums, target):
+              seen = {}
+              for i, n in enumerate(nums):
+                  seen[n] = i
+                  if target - n in seen:
+                      return [seen[target - n], i]
+              return None
+        bug_line: 4
+        explanation: Storing n before checking lets an element pair with itself. Check for the complement first, then store n (move line 4 after the if).
+        hint: Can the same element be used twice?
+
+      - id: logic.hashing.parsons-two-sum
+        type: parsons
+        prompt: Put the one-pass two-sum back in order.
+        lines:
+          - "def two_sum(nums, target):"
+          - "    seen = {}"
+          - "    for i, n in enumerate(nums):"
+          - "        if target - n in seen:"
+          - "            return [seen[target - n], i]"
+          - "        seen[n] = i"
+          - "    return None"
+        explanation: Look up the complement first, then remember the current value; return None only after the loop finishes.
+        hint: The lookup must happen before the insert.
+
+      - id: logic.hashing.code-two-sum-pass
+        type: code
+        language: python
+        prompt: "two_sum returns the indices of two different elements that add up to target, in one pass with a dict. Make it print (1, 2) and (0, 3)."
+        starter: |
+          def two_sum(nums, target):
+              seen = {}
+              for i, x in enumerate(nums):
+                  seen[x] = i
+                  if target - x in seen:
+                      return (seen[target - x], i)
+              return None
+
+          print(two_sum([3, 2, 4], 6))
+          print(two_sum([1, 5, 7, 2], 3))
+        solution: |
+          def two_sum(nums, target):
+              seen = {}
+              for i, x in enumerate(nums):
+                  if target - x in seen:
+                      return (seen[target - x], i)
+                  seen[x] = i
+              return None
+
+          print(two_sum([3, 2, 4], 6))
+          print(two_sum([1, 5, 7, 2], 3))
+        expected: |
+          (1, 2)
+          (0, 3)
+        explanation: "Inserting x before the lookup lets an element pair with itself: for 3 and target 6 it finds 3 at once and returns (0, 0). Looking up first means seen holds only earlier elements. Each step is an O(1) average dict operation, so the pass is O(n) instead of the O(n²) pair check."
+        hint: When x is 3 and target is 6, what is already in seen?
+
+  - id: logic.two-pointers
+    title: Two pointers
+    summary: >
+      Two indices moving toward each other (or at different speeds) solve many
+      array and string problems in O(n) time and O(1) extra space.
+    level: intermediate
+    prereqs: [logic.big-o]
+    lesson:
+      intro: Two indices start at the two ends of a sorted list and walk toward each other. Each step rules out one candidate for good.
+      example:
+        lang: python
+        code: |
+          def pair_sum(a, target):
+              lo, hi = 0, len(a) - 1
+              while lo < hi:
+                  s = a[lo] + a[hi]
+                  if s == target:
+                      return a[lo], a[hi]
+                  if s < target:
+                      lo += 1
+                  else:
+                      hi -= 1
+              return None
+
+          print(pair_sum([1, 3, 4, 6, 9], 13))
+      steps:
+        - text: lo starts at index 0 and hi at len(a) - 1, the last valid index. Starting hi at len(a) would read past the end.
+        - text: 1 + 9 = 10 is too small. Only moving lo right can make the sum bigger, because the list is sorted.
+          predict:
+            prompt: The sum 1 + 9 = 10 is below 13. Which pointer moves?
+            options:
+              - text: hi moves left
+                explanation: In a sorted list a[hi - 1] <= a[hi], so that can only make the sum smaller.
+              - text: Both move inward
+                explanation: Moving hi would throw away 9, which may still be part of the answer.
+              - text: lo moves right
+                correct: true
+        - text: "Sorted order is what makes each move safe: lo moving right never lowers the sum, hi moving left never raises it. On an unsorted list a move could skip the answer, so use a hash set there."
+          predict:
+            prompt: What does pair_sum([1, 3, 4, 6, 9], 13) print?
+            options:
+              - text: (4, 9)
+                correct: true
+              - text: (6, 9)
+                explanation: 6 + 9 = 15. The search goes 1+9, 3+9, then 4+9 = 13 and returns there.
+              - text: None
+                explanation: 4 + 9 = 13 is in the list, and the pointers reach it on the third step.
+        - text: Every step moves one pointer, so at most n steps run, O(n) time and O(1) extra space. The same converging loop reverses a list in place (swap a[lo] and a[hi]) and stops when the pointers meet, leaving the middle alone.
+      takeaway: Converging pointers on sorted data discard one candidate per step, O(n) time and O(1) space.
+    items:
+      - id: logic.two-pointers.output-reverse
+        type: output
+        prompt: What does this print?
+        code: |
+          a = [1, 2, 3, 4, 5]
+          i, j = 0, len(a) - 1
+          while i < j:
+              a[i], a[j] = a[j], a[i]
+              i += 1
+              j -= 1
+          print(a)
+        answers: ["[5, 4, 3, 2, 1]"]
+        explanation: The pointers swap the outer pair and move inward until they meet; the middle element stays in place. O(n) time, O(1) space.
+        hint: Swap (0,4), then (1,3), then stop.
+
+      - id: logic.two-pointers.bug-palindrome
+        type: bug
+        prompt: This palindrome check crashes with IndexError. Which line is wrong?
+        code: |
+          def is_palindrome(s):
+              i, j = 0, len(s)
+              while i < j:
+                  if s[i] != s[j]:
+                      return False
+                  i += 1
+                  j -= 1
+              return True
+        bug_line: 2
+        explanation: The last valid index is len(s) - 1. Starting j at len(s) reads one past the end on the first comparison.
+        hint: What is the index of the last character?
+
+      - id: logic.two-pointers.cloze-pair-sum
+        type: cloze
+        prompt: Complete the pair-sum search on a sorted list (one statement per blank).
+        code: |
+          i, j = 0, len(a) - 1
+          while i < j:
+              s = a[i] + a[j]
+              if s == target:
+                  return (i, j)
+              if s < target:
+                  ___
+              else:
+                  ___
+        answers: ["i += 1 | j -= 1", "i = i + 1 | j = j - 1"]
+        explanation: The list is sorted, so a sum that is too small can only grow by moving i right, and a sum that is too big can only shrink by moving j left.
+        hint: Which pointer increases the sum?
+
+      - id: logic.two-pointers.mcq-why-sorted
+        type: mcq
+        prompt: Why does the converging two-pointer pair-sum need the input to be sorted?
+        options:
+          - text: Sorting guarantees that moving i right never decreases the sum and moving j left never increases it, so each move safely discards a candidate
+            correct: true
+            explanation: Monotonicity is what lets each step rule out a whole row or column of pairs.
+          - text: Sorting removes duplicates
+            misconception: sorting-removes-duplicates
+            explanation: Sorting reorders elements; duplicates remain.
+          - text: It does not; two pointers work on any list
+            misconception: two-pointers-any-order
+            explanation: On an unsorted list moving a pointer can make the sum go either way, so you might skip the answer.
+        explanation: Two pointers exploit order. Without it, use a hash set instead.
+        hint: What happens to a[i] when i moves right in a sorted list?
+
+      - id: logic.two-pointers.code-pair-sum
+        type: code
+        language: go
+        prompt: "pairWithSum looks for two values of a sorted slice that add up to target, moving two pointers inward. Fix the moves so it prints 4 9 true, then 0 0 false."
+        starter: |
+          package main
+
+          import "fmt"
+
+          func pairWithSum(nums []int, target int) (int, int, bool) {
+              lo, hi := 0, len(nums)-1
+              for lo < hi {
+                  s := nums[lo] + nums[hi]
+                  switch {
+                  case s == target:
+                      return nums[lo], nums[hi], true
+                  case s < target:
+                      hi--
+                  default:
+                      lo++
+                  }
+              }
+              return 0, 0, false
+          }
+
+          func main() {
+              fmt.Println(pairWithSum([]int{1, 3, 4, 6, 9}, 13))
+              fmt.Println(pairWithSum([]int{1, 2, 5}, 100))
+          }
+        solution: |
+          package main
+
+          import "fmt"
+
+          func pairWithSum(nums []int, target int) (int, int, bool) {
+              lo, hi := 0, len(nums)-1
+              for lo < hi {
+                  s := nums[lo] + nums[hi]
+                  switch {
+                  case s == target:
+                      return nums[lo], nums[hi], true
+                  case s < target:
+                      lo++
+                  default:
+                      hi--
+                  }
+              }
+              return 0, 0, false
+          }
+
+          func main() {
+              fmt.Println(pairWithSum([]int{1, 3, 4, 6, 9}, 13))
+              fmt.Println(pairWithSum([]int{1, 2, 5}, 100))
+          }
+        expected: |
+          4 9 true
+          0 0 false
+        explanation: "When the sum is too small, only moving lo right can make it bigger, because nums is sorted; when it is too big, move hi left. The starter does the opposite, so 1 + 9 = 10 < 13 shrinks the sum further and it never finds 4 + 9. Each step drops one candidate: O(n) time, O(1) extra space."
+        hint: The sum is too small. Which pointer can make it larger?
+
+  - id: logic.recursion
+    title: Recursion
+    summary: >
+      A recursive function solves a problem by calling itself on a smaller
+      input; it needs a base case that every call eventually reaches.
+    level: intermediate
+    prereqs: [logic.big-o]
+    lesson:
+      intro: A recursive function calls itself on a smaller input. A base case stops it, and each call waits on the stack for the one it started.
+      example:
+        lang: python
+        code: |
+          def depth(n):
+              if n == 0:
+                  return "done"
+              print("down", n)
+              result = depth(n - 1)
+              print("up", n)
+              return result
+
+          depth(2)
+      steps:
+        - text: "Two parts: the base case (n == 0) returns without calling itself, and the recursive case calls depth on a smaller input, n - 1."
+        - text: depth(2) prints down 2, then calls depth(1), which prints down 1 before its own call. A line after the recursive call has to wait until that call returns.
+          predict:
+            prompt: depth(2) has printed down 2. What prints next?
+            options:
+              - text: up 2
+                explanation: up 2 is after the call depth(1), so it waits until depth(1) has finished.
+              - text: down 1
+                correct: true
+        - text: depth(0) returns at once. The stack unwinds from the deepest call, so lines after the call run in reverse order, up 1 then up 2. Depth n uses n stack frames, O(n) memory.
+        - text: n goes -1, -2, -3… and never equals 0, so Python stops it with RecursionError. Every input must reach the base case; n <= 0 would be safer.
+          predict:
+            prompt: What does depth(-1) do?
+            options:
+              - text: Returns "done" right away
+                explanation: -1 is not 0, so the base case does not match.
+              - text: Prints down 0 and stops
+                explanation: After 0 comes -1, never back to 0; n keeps going down.
+              - text: Recurses until RecursionError
+                correct: true
+        - text: "A function that calls itself twice, like fib(n - 1) + fib(n - 2), doubles the calls per level and recomputes the same subproblems: exponential time unless results are cached."
+      takeaway: A base case every input reaches, a smaller recursive call, and lines after the call run as the stack unwinds.
+    items:
+      - id: logic.recursion.output-sum
+        type: output
+        prompt: What does this print?
+        code: |
+          def f(n):
+              if n == 0:
+                  return 0
+              return n + f(n - 1)
+          print(f(4))
+        answers: ["10"]
+        explanation: f(4) = 4 + 3 + 2 + 1 + 0 = 10. Each call waits for the smaller one, using O(n) stack depth.
+        hint: Expand f(4) into f(3), f(2)…
+
+      - id: logic.recursion.output-unwind-order
+        type: output
+        prompt: What does this print?
+        code: |
+          def show(n):
+              if n == 0:
+                  return
+              show(n - 1)
+              print(n, end=" ")
+          show(3)
+        answers: ["1 2 3"]
+        explanation: The print happens after the recursive call returns, so the deepest call (n=1) prints first while the stack unwinds.
+        hint: Is the print before or after the recursive call?
+
+      - id: logic.recursion.bug-base-case
+        type: bug
+        prompt: fact(0) raises RecursionError. Which line is wrong?
+        code: |
+          def fact(n):
+              if n == 1:
+                  return 1
+              return n * fact(n - 1)
+          print(fact(0))
+        bug_line: 2
+        explanation: Starting from 0, n goes 0, -1, -2… and never equals 1. The base case should be `n <= 1` (0! = 1).
+        hint: Does every input reach the base case?
+
+      - id: logic.recursion.mcq-naive-fib
+        type: mcq
+        prompt: What is the time complexity of the naive recursive Fibonacci `fib(n) = fib(n-1) + fib(n-2)`?
+        options:
+          - text: Exponential, about O(2ⁿ)
+            correct: true
+            explanation: Each call branches into two, and the same subproblems are recomputed many times.
+          - text: O(n)
+            misconception: recursion-is-linear
+            explanation: Only the memoized (or iterative) version is O(n); without a cache subproblems are recomputed.
+          - text: O(n²)
+            misconception: two-calls-means-quadratic
+            explanation: Two calls per level double the work at each level of depth n — exponential, not quadratic.
+        explanation: Memoization (functools.cache) collapses the repeated subproblems and makes it O(n).
+        hint: Draw the call tree for fib(5) and count the fib(2) nodes.
+
+      - id: logic.recursion.code-stairs-base
+        type: code
+        language: python
+        prompt: "ways(n) counts how many ways you can climb n stairs taking 1 or 2 steps at a time. Fix the base case so it prints 1 2 3 5 8 for n = 1..5."
+        starter: |
+          def ways(n):
+              if n <= 1:
+                  return n
+              return ways(n - 1) + ways(n - 2)
+
+          print(*(ways(n) for n in range(1, 6)))
+        solution: |
+          def ways(n):
+              if n <= 1:
+                  return 1
+              return ways(n - 1) + ways(n - 2)
+
+          print(*(ways(n) for n in range(1, 6)))
+        expected: |
+          1 2 3 5 8
+        explanation: "There is exactly one way to climb 0 stairs: take no steps. Returning n makes ways(0) = 0, so ways(2) = ways(1) + ways(0) = 1 and every later answer is shifted (1 1 2 3 5). The recursive case was right; the base case value was wrong."
+        hint: How many ways are there to climb 0 stairs?
+
+  - id: logic.binary-search
+    title: Binary search
+    summary: >
+      On sorted data, compare with the middle element and discard half of the
+      range each step: O(log n). Off-by-one boundaries are the classic trap.
+    level: intermediate
+    prereqs: [logic.two-pointers]
+    lesson:
+      intro: On sorted data, one comparison with the middle element tells you which half cannot hold the answer. Halving the range each step costs O(log n).
+      example:
+        lang: python
+        code: |
+          def lower_bound(a, x):
+              lo, hi = 0, len(a)  # half-open [lo, hi)
+              while lo < hi:
+                  mid = (lo + hi) // 2
+                  if a[mid] < x:
+                      lo = mid + 1
+                  else:
+                      hi = mid
+              return lo
+
+          a = [2, 4, 4, 8, 9]
+          print(lower_bound(a, 4), lower_bound(a, 5))
+      steps:
+        - text: If a[mid] < x, every element left of mid is smaller too, so the whole left half is discarded. That is only safe because a is sorted (more generally, because the test is monotonic).
+        - text: "hi = len(a) is one past the end: the range [lo, hi) excludes hi, so the loop runs while lo < hi and sets hi = mid, because mid may be the answer."
+          predict:
+            prompt: Why hi = mid here and not hi = mid - 1?
+            options:
+              - text: It is just faster
+                explanation: Speed is the same; the boundary is about not skipping a possible answer.
+              - text: mid may be the answer, and hi is excluded from the range
+                correct: true
+        - text: "lower_bound returns the first index whose value is >= x: 1 for 4 (the first of the two 4s), and 3 for 5, where 5 would be inserted. Duplicates are fine."
+          predict:
+            prompt: What does the program print?
+            options:
+              - text: 2 3
+                explanation: The search keeps moving hi left while a[mid] >= 4, so it lands on the first 4 at index 1.
+              - text: 1 2
+                explanation: 5 is not in the list; the result is where it would go, after both 4s, index 3.
+              - text: 1 3
+                correct: true
+        - text: "The other style is inclusive: hi = len(a) - 1, while lo <= hi, hi = mid - 1, because a one-element range lo == hi must still be checked. Mixing the two styles is the classic off-by-one. bisect.bisect_left works like lower_bound; bisect_right returns the index after the last equal element."
+      takeaway: Sorted (monotonic) input lets you discard half each step; pick inclusive or half-open bounds and stay consistent.
+    items:
+      - id: logic.binary-search.bug-loop-condition
+        type: bug
+        prompt: search([1, 2], 2) returns -1. Which line is wrong?
+        code: |
+          def search(a, x):
+              lo, hi = 0, len(a) - 1
+              while lo < hi:
+                  mid = (lo + hi) // 2
+                  if a[mid] == x:
+                      return mid
+                  if a[mid] < x:
+                      lo = mid + 1
+                  else:
+                      hi = mid - 1
+              return -1
+        bug_line: 3
+        explanation: With an inclusive hi, a one-element range (lo == hi) still has to be checked. The condition must be `lo <= hi`.
+        hint: What happens when lo and hi point to the same element?
+
+      - id: logic.binary-search.parsons-search
+        type: parsons
+        prompt: Order the lines of an iterative binary search with an inclusive range.
+        lines:
+          - "def search(a, x):"
+          - "    lo, hi = 0, len(a) - 1"
+          - "    while lo <= hi:"
+          - "        mid = (lo + hi) // 2"
+          - "        if a[mid] == x:"
+          - "            return mid"
+          - "        elif a[mid] < x:"
+          - "            lo = mid + 1"
+          - "        else:"
+          - "            hi = mid - 1"
+          - "    return -1"
+        explanation: Initialize an inclusive range, loop while it is non-empty, compare the middle and move the boundary past mid.
+        hint: The equality check comes before deciding which half to keep.
+
+      - id: logic.binary-search.output-bisect
+        type: output
+        prompt: What does this print?
+        code: |
+          import bisect
+          a = [1, 3, 3, 3, 7]
+          print(bisect.bisect_left(a, 3), bisect.bisect_right(a, 3))
+        options:
+          - text: "1 4"
+            correct: true
+            explanation: bisect_left returns the first index where 3 could be inserted (before the existing 3s); bisect_right returns the index after the last 3.
+          - text: "1 3"
+            misconception: bisect-right-last-index
+            explanation: bisect_right returns the insertion point after the last 3, not the index of the last 3.
+          - text: "2 2"
+            misconception: bisect-returns-middle
+            explanation: bisect finds insertion points at the edges of the run of equal values, not the middle one.
+        explanation: bisect_right - bisect_left is the number of occurrences, here 3. Both run in O(log n).
+        hint: Where would a new 3 go if it must stay left of all 3s? And right of them?
+
+      - id: logic.binary-search.mcq-precondition
+        type: mcq
+        prompt: Which condition must hold for binary search to find x correctly?
+        options:
+          - text: The sequence is sorted (or the predicate is monotonic)
+            correct: true
+            explanation: Discarding half the range is only safe when everything on one side is known to be too small or too big.
+          - text: The sequence has no duplicates
+            misconception: binary-search-needs-unique
+            explanation: Duplicates are fine; bisect_left and bisect_right handle them.
+          - text: The length is a power of two
+            misconception: binary-search-power-of-two
+            explanation: Integer division of the range works for any length.
+        explanation: Binary search works on any monotonic predicate, which is why it also solves "smallest x such that…" problems.
+        hint: What lets you throw away half of the elements without looking at them?
+
+      - id: logic.binary-search.code-lower-bound
+        type: code
+        language: go
+        prompt: "lowerBound returns the first index whose value is >= x, or len(xs) when every value is smaller. Fix the bounds so it prints 0 1 2 4."
+        starter: |
+          package main
+
+          import "fmt"
+
+          func lowerBound(xs []int, x int) int {
+              lo, hi := 0, len(xs)-1
+              for lo < hi {
+                  mid := lo + (hi-lo)/2
+                  if xs[mid] < x {
+                      lo = mid + 1
+                  } else {
+                      hi = mid
+                  }
+              }
+              return lo
+          }
+
+          func main() {
+              xs := []int{1, 3, 5, 7}
+              fmt.Println(lowerBound(xs, 0), lowerBound(xs, 3), lowerBound(xs, 4), lowerBound(xs, 8))
+          }
+        solution: |
+          package main
+
+          import "fmt"
+
+          func lowerBound(xs []int, x int) int {
+              lo, hi := 0, len(xs)
+              for lo < hi {
+                  mid := lo + (hi-lo)/2
+                  if xs[mid] < x {
+                      lo = mid + 1
+                  } else {
+                      hi = mid
+                  }
+              }
+              return lo
+          }
+
+          func main() {
+              xs := []int{1, 3, 5, 7}
+              fmt.Println(lowerBound(xs, 0), lowerBound(xs, 3), lowerBound(xs, 4), lowerBound(xs, 8))
+          }
+        expected: |
+          0 1 2 4
+        explanation: "The answer can be any index from 0 to len(xs), so the half-open range [lo, hi) must start as [0, len(xs)). With hi = len(xs)-1 the index len(xs) can never be returned, and 8 gets 3 instead of 4. lo + (hi-lo)/2 avoids overflow on huge ranges."
+        hint: Which answers are possible, and does the starting range include all of them?
+
+  - id: logic.sorting
+    title: Sorting
+    summary: >
+      Comparison sorts cannot beat O(n log n). Know merge sort, quicksort,
+      stability, and that Python uses stable Timsort.
+    level: advanced
+    prereqs: [logic.recursion, logic.binary-search]
+    lesson:
+      intro: Merge sort splits the list in halves, sorts each half and merges them. Its cost is the same for every input.
+      example:
+        lang: python
+        code: |
+          def merge_sort(xs):
+              if len(xs) <= 1:
+                  return xs
+              mid = len(xs) // 2
+              left = merge_sort(xs[:mid])
+              right = merge_sort(xs[mid:])
+              out, i, j = [], 0, 0
+              while i < len(left) and j < len(right):
+                  if left[i] <= right[j]:
+                      out.append(left[i]); i += 1
+                  else:
+                      out.append(right[j]); j += 1
+              return out + left[i:] + right[j:]
+
+          print(merge_sort([5, 2, 4, 1, 3]))
+      steps:
+        - text: The split does not look at the data, so there are always about log₂ n levels of halving, down to lists of length 1.
+        - text: Merging two sorted lists takes the smaller head each time, so one level touches every element once, O(n). log n levels of O(n) work give O(n log n), even in the worst case.
+          predict:
+            prompt: How much work do all the merges at one level of the recursion do together?
+            options:
+              - text: O(n)
+                correct: true
+              - text: O(n²)
+                explanation: Each element is copied once per level; merging never compares every pair.
+              - text: O(log n)
+                explanation: log n is the number of levels, not the work inside one.
+        - text: On a tie, <= takes from left first, so equal keys keep their original order. That makes merge sort stable. Heapsort and classic in-place quicksort are not.
+          predict:
+            prompt: left[i] equals right[j]. Which one goes into out first?
+            options:
+              - text: right[j]
+                explanation: The test is <=, so a tie takes the left element.
+              - text: left[i]
+                correct: true
+        - text: Quicksort is O(n log n) on average but O(n²) when the pivot keeps splitting badly (first element on sorted input). Python's sorted() and list.sort() use Timsort, which is stable and O(n log n); key= chooses what is compared.
+        - text: "No comparison sort beats about n log n comparisons in the worst case: there are n! orderings and each comparison at best halves them, log₂(n!) ≈ n log n."
+      takeaway: Merge sort is O(n log n) in every case and stable; comparison sorts cannot do better than n log n.
+    items:
+      - id: logic.sorting.mcq-worst-case
+        type: mcq
+        prompt: Which sort guarantees O(n log n) time in the worst case?
+        options:
+          - text: Merge sort
+            correct: true
+            explanation: It always splits in halves and merges in linear time, log n levels of O(n) work.
+          - text: Quicksort with the first element as pivot
+            misconception: quicksort-always-nlogn
+            explanation: On already-sorted input this pivot gives maximally unbalanced partitions, O(n²).
+          - text: Insertion sort
+            misconception: insertion-sort-fast
+            explanation: It is O(n) on nearly sorted input but O(n²) in the worst case.
+        explanation: Merge sort (and heapsort) are worst-case O(n log n); quicksort is O(n log n) only on average.
+        hint: Which algorithm splits the input the same way whatever the data?
+
+      - id: logic.sorting.multi-stable
+        type: multi
+        prompt: Which sorts are stable (equal keys keep their original relative order)?
+        options:
+          - text: Merge sort
+            correct: true
+            explanation: When keys are equal the merge takes from the left half first, preserving order.
+          - text: Python's sorted() / list.sort() (Timsort)
+            correct: true
+            explanation: Python guarantees stability, which makes multi-key sorts in several passes work.
+          - text: Insertion sort
+            correct: true
+            explanation: It only moves an element past strictly greater ones.
+          - text: Heapsort
+            misconception: all-sorts-stable
+            explanation: Heap operations swap distant elements, so equal keys can be reordered.
+          - text: Classic in-place quicksort
+            misconception: all-sorts-stable
+            explanation: Partitioning swaps elements across the array and loses the order of equal keys.
+        explanation: Stability matters when you sort records by one key after another.
+        hint: Do equal elements ever jump over each other?
+
+      - id: logic.sorting.output-stable-key
+        type: output
+        prompt: What does this print?
+        code: |
+          words = ["bb", "a", "ccc", "dd", "e"]
+          print(sorted(words, key=len))
+        options:
+          - text: "['a', 'e', 'bb', 'dd', 'ccc']"
+            correct: true
+            explanation: Sorted by length; words of equal length keep their original order because the sort is stable.
+          - text: "['e', 'a', 'dd', 'bb', 'ccc']"
+            misconception: sort-not-stable
+            explanation: Python's sort is stable, so 'a' (seen first) stays before 'e'.
+          - text: "['a', 'bb', 'ccc', 'dd', 'e']"
+            misconception: key-ignored
+            explanation: That is alphabetical order; key=len sorts by length.
+        explanation: key= maps each element to the value compared; ties keep input order.
+        hint: Group the words by length first.
+
+      - id: logic.sorting.cloze-lower-bound
+        type: cloze
+        prompt: "Any comparison-based sort needs Ω(___) comparisons in the worst case."
+        answers: ["n log n", "nlogn", "n lg n", "n log(n)"]
+        explanation: There are n! possible orderings and each comparison halves them at best, so log₂(n!) ≈ n log n comparisons are needed. Counting sort beats it only by not comparing.
+        hint: How many orderings of n elements exist?
+
+      - id: logic.sorting.code-stable-merge
+        type: code
+        language: python
+        prompt: "merge combines two runs sorted by key, as in merge sort. Keep it stable (on equal keys, left before right) so it prints a c b d."
+        starter: |
+          def merge(left, right):
+              out, i, j = [], 0, 0
+              while i < len(left) and j < len(right):
+                  if left[i][0] < right[j][0]:
+                      out.append(left[i])
+                      i += 1
+                  else:
+                      out.append(right[j])
+                      j += 1
+              return out + left[i:] + right[j:]
+
+          left = [(1, "a"), (2, "b")]
+          right = [(1, "c"), (3, "d")]
+          print(*(label for _, label in merge(left, right)))
+        solution: |
+          def merge(left, right):
+              out, i, j = [], 0, 0
+              while i < len(left) and j < len(right):
+                  if left[i][0] <= right[j][0]:
+                      out.append(left[i])
+                      i += 1
+                  else:
+                      out.append(right[j])
+                      j += 1
+              return out + left[i:] + right[j:]
+
+          left = [(1, "a"), (2, "b")]
+          right = [(1, "c"), (3, "d")]
+          print(*(label for _, label in merge(left, right)))
+        expected: |
+          a c b d
+        explanation: "With < a tie takes the right element first, so c jumps ahead of a and the sort is no longer stable (c a b d). <= keeps equal keys in their original order, which is what makes merge sort stable, the property that lets you sort by one key after another."
+        hint: On a tie, which run should give up its element first?

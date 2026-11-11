@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                        │ ▾ LESSON          not graded
+ Logic            ────────   0% │                                                        │ ✓ intro & example
+  ▸ ○ Loops                     │ ┌─ Logic › Loops ──────────────── lesson · step 1/3 ─┐ │ ▸ step 1
+                                │ │                                                    │ │ · step 2 · predict
+                                │ │ A for loop repeats its body while its condition    │ │ · step 3
+                                │ │ holds.                                             │ │ · takeaway
+                                │ │                                                    │ │
+                                │ │  1  for i := 0; i < 3; i++ {                   go  │ │ ▾ CONCEPT           beginner
+                                │ │  2      fmt.Println(i)                             │ │ Repeat a block while a
+                                │ │  3  }                                              │ │ condition holds.
+                                │ │                                                    │ │
+                                │ │ ▸ 1  i := 0 runs once, before the first check of i │ │ ▾ PREREQUISITES
+                                │ │      < 3.                                          │ │ None: a starting point.
+                                │ │                                                    │ │
+                                │ │   enter  next step     s  skip lesson              │ │ Predictions are only for
+                                │ │                                                    │ │ you: nothing here is graded
+                                │ └────────────────────────────────────────────────────┘ │ or scheduled. The questions
+                                │                                                        │ start after the takeaway.
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+                                │                                                        │
+ ────────────────────────────── │                                                        │
+ ● █ mastered  ◑ ▓ review       │                                                        │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                        │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats          lesson [●··] step 1/3 │ session [●] 1/1 ✓0 ✗0 │ streak 0d
+ lesson · logic.loops · not graded                                         enter next · s skip lesson · ? help · q quit

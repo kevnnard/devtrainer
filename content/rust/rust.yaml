@@ -1,0 +1,2237 @@
+track:
+  id: rust
+  title: Rust
+  description: Rust 2021/2024 edition — ownership, borrowing, enums, traits, lifetimes, iterators, smart pointers, errors, threads and cargo.
+  order: 66
+
+concepts:
+  - id: rust.bindings
+    title: Bindings, mutability and shadowing
+    summary: >
+      let bindings are immutable unless marked mut. Shadowing declares a new
+      binding with the same name, which may even change the type. Integer
+      overflow panics in debug builds.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: In Rust a let binding cannot change unless you say so with mut. Reusing a name with a new let is a different thing, called shadowing.
+      example:
+        lang: rust
+        code: |
+          fn main() {
+              let x = 5;
+              let x = x * 2;
+              {
+                  let x = "ten";
+                  println!("{x}");
+              }
+              println!("{x}");
+              let mut n = 1;
+              n += 1;
+              println!("{n}");
+          }
+      steps:
+        - text: "let x = 5 is immutable. Writing x = 6 later is rejected with error[E0384]: cannot assign twice to immutable variable `x`."
+          predict:
+            prompt: What happens if the second line were x = x * 2 (no let)?
+            options:
+              - text: It compiles and x becomes 10
+                explanation: Plain assignment needs a mut binding; only let creates a new one.
+              - text: A compile error, E0384
+                correct: true
+              - text: It panics at run time
+                explanation: Mutability is checked by the compiler, never at run time.
+        - text: let x = x * 2 is shadowing. It creates a new x from the old one (10); nothing is mutated. The old binding is simply no longer reachable by that name.
+        - text: Shadowing can even change the type. Inside the block a new x of type &str hides the outer one, and the block prints ten.
+        - text: When the block ends, its x goes away and the outer x is visible again.
+          predict:
+            prompt: What does the second println! print?
+            options:
+              - text: ten
+                explanation: The inner x lived only inside the block.
+              - text: "10"
+                correct: true
+              - text: "5"
+                explanation: let x = x * 2 already shadowed the first x with 10.
+        - text: let mut n allows n += 1, so the last line prints 2. mut lets the value change but never the type.
+      takeaway: Bindings are immutable by default; mut allows changes of value, shadowing with let makes a new binding that may change type.
+    items:
+      - id: rust.bindings.output-shadow-block
+        type: output
+        prompt: What does this print?
+        code: |
+          fn main() {
+              let x = 1;
+              let x = x + 1;
+              {
+                  let x = x * 10;
+                  print!("{x} ");
+              }
+              println!("{x}");
+          }
+        answers: ["20 2"]
+        explanation: The second let shadows x with 2. The block shadows it again with 20, prints it, and when the block ends the outer x (2) is back.
+        hint: Shadowing inside a block lasts only until the block ends.
+
+      - id: rust.bindings.bug-missing-mut
+        type: bug
+        prompt: "rustc rejects this with E0384 (cannot assign twice to immutable variable). Which line must change so it compiles?"
+        code: |
+          fn main() {
+              let total = 0;
+              for i in 1..=3 {
+                  total += i;
+              }
+              println!("{total}");
+          }
+        bug_line: 2
+        explanation: "The error is reported at total += i, but the fix is the declaration: let mut total = 0. Bindings are immutable unless declared mut."
+        hint: Which line decides whether total may change?
+
+      - id: rust.bindings.mcq-shadow-vs-mut
+        type: mcq
+        prompt: You read s = " 42 " and want s to become the number 42. Which version compiles?
+        options:
+          - text: "let s = \" 42 \"; let s: i32 = s.trim().parse().unwrap();"
+            correct: true
+            explanation: Shadowing creates a new binding, so the new s may have a different type (i32).
+          - text: "let mut s = \" 42 \"; s = s.trim().parse::<i32>().unwrap();"
+            misconception: mut-changes-type
+            explanation: mut allows a new value of the same type only. Assigning an i32 to a &str binding is error E0308, mismatched types.
+          - text: "let s = \" 42 \"; s = s.trim().parse::<i32>().unwrap();"
+            misconception: let-is-mutable
+            explanation: Without mut you cannot assign at all (E0384), and the type would not match either.
+        explanation: Use shadowing when a value is transformed into another type; use mut when the same variable really changes over time.
+        hint: Which of the two lets a name switch to another type?
+
+      - id: rust.bindings.mcq-overflow
+        type: mcq
+        prompt: "let a: u8 = black_box(255); let b = a + 1; What happens in a debug build (cargo run)?"
+        options:
+          - text: "It panics: attempt to add with overflow"
+            correct: true
+            explanation: Debug builds check integer overflow and panic. Release builds (-O / --release) wrap to 0 instead.
+          - text: b is 256
+            misconception: integer-widens
+            explanation: The type of a + 1 is still u8, which cannot hold 256. Rust never widens integers silently.
+          - text: b is 0 in every build
+            misconception: overflow-always-wraps
+            explanation: Only release builds wrap by default. Use wrapping_add or checked_add when you mean it.
+          - text: It does not compile
+            misconception: overflow-always-compile-error
+            explanation: "The compiler rejects overflow it can see in constants (like let a: u8 = 256), but black_box hides the value, so the check happens at run time."
+        explanation: Say what you want explicitly with checked_add (returns Option), wrapping_add or saturating_add.
+        hint: Debug and release builds treat overflow differently.
+
+      - id: rust.bindings.code-mut-total
+        type: code
+        language: rust
+        prompt: The program should print 50. Read the compiler error and fix the binding that has to change.
+        starter: |
+          fn main() {
+              let input = "42";
+              let input: i32 = input.parse().unwrap();
+              let total = 0;
+              for n in [input, 8] {
+                  total += n;
+              }
+              println!("{total}");
+          }
+        solution: |
+          fn main() {
+              let input = "42";
+              let input: i32 = input.parse().unwrap();
+              let mut total = 0;
+              for n in [input, 8] {
+                  total += n;
+              }
+              println!("{total}");
+          }
+        expected: |
+          50
+        explanation: Bindings are immutable unless declared with mut, so total += n is error E0384 (cannot assign twice to an immutable variable). The second let input is shadowing, not mutation; it creates a new binding of a different type (i32) with the same name, which is fine without mut.
+        hint: Which keyword allows a binding to change?
+
+  - id: rust.cargo
+    title: Cargo basics
+    summary: >
+      cargo creates, builds, runs and tests packages. Cargo.toml declares the
+      package and its dependencies, Cargo.lock pins exact versions, and builds
+      land in target/debug or target/release.
+    level: beginner
+    prereqs: [rust.bindings]
+    lesson:
+      intro: You rarely call rustc yourself. cargo creates the project, fetches dependencies, compiles and runs it.
+      example:
+        lang: shell
+        code: |
+          $ cargo new hello
+              Creating binary (application) `hello` package
+          $ cd hello && cat Cargo.toml
+          [package]
+          name = "hello"
+          version = "0.1.0"
+          edition = "2024"
+
+          [dependencies]
+          $ cargo run
+             Compiling hello v0.1.0 (/home/me/hello)
+              Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
+               Running `target/debug/hello`
+          Hello, world!
+      steps:
+        - text: cargo new hello creates a folder with Cargo.toml, src/main.rs (a hello-world main), a .gitignore and a git repository. cargo new --lib creates src/lib.rs instead, for a library.
+        - text: Cargo.toml is the manifest. edition picks the language edition; new projects get the newest one. [dependencies] lists crates from crates.io; cargo add serde writes a line there for you.
+        - text: cargo run compiles in the dev profile (fast to build, no optimizations) and then runs the binary.
+          predict:
+            prompt: Where does cargo run put the binary?
+            options:
+              - text: target/debug/hello
+                correct: true
+              - text: ./hello next to Cargo.toml
+                explanation: Everything cargo builds goes under target/.
+              - text: target/release/hello
+                explanation: release is used only with --release (or -r).
+        - text: The first build also writes Cargo.lock, which pins the exact version of every dependency so the next build uses the same ones. Commit it for applications.
+        - text: "cargo check type-checks without producing a binary (the fastest loop while editing). cargo build --release optimizes into target/release. cargo test runs #[test] functions; cargo fmt and cargo clippy format and lint."
+      takeaway: cargo new, check, run, test, build --release; Cargo.toml declares, Cargo.lock pins, target/ holds the output.
+    items:
+      - id: rust.cargo.command-check
+        type: command
+        prompt: Type-check the current package as fast as possible, without producing a binary.
+        answers: ["cargo check"]
+        explanation: cargo check runs the compiler's analysis but skips code generation, so it is much faster than cargo build.
+        hint: The subcommand name says it checks.
+
+      - id: rust.cargo.command-release
+        type: command
+        prompt: Build the package with optimizations for production.
+        answers: ["cargo build --release", "cargo build -r"]
+        explanation: The release profile turns on optimizations and writes the binary to target/release/.
+        hint: The profile is called release.
+
+      - id: rust.cargo.command-run-args
+        type: command
+        prompt: Run the binary and pass the argument --verbose to your program, not to cargo.
+        answers: ["cargo run -- --verbose"]
+        explanation: Everything after -- goes to the program; std::env::args() then sees --verbose.
+        hint: A separator tells cargo where its own flags end.
+
+      - id: rust.cargo.mcq-lockfile
+        type: mcq
+        prompt: What is Cargo.lock for?
+        options:
+          - text: It records the exact versions of every dependency so builds are reproducible
+            correct: true
+            explanation: Cargo.toml says which versions are acceptable (serde = "1"); Cargo.lock records the ones actually chosen.
+          - text: It stops two cargo processes from building at the same time
+            misconception: lockfile-is-mutex
+            explanation: It is not a file lock; it is a list of resolved versions.
+          - text: It lists the dependencies you add by hand instead of Cargo.toml
+            misconception: lockfile-hand-edited
+            explanation: cargo generates and updates Cargo.lock; you edit Cargo.toml (or use cargo add).
+        explanation: cargo update moves the locked versions forward within what Cargo.toml allows.
+        hint: Two machines should build the same thing.
+
+      - id: rust.cargo.code-dev-profile-overflow
+        type: code
+        language: rust
+        prompt: Built like cargo run (the dev profile), this checksum panics. Make the u8 addition wrap around on purpose, as a checksum should.
+        starter: |
+          fn checksum(data: &[u8]) -> u8 {
+              let mut sum: u8 = 0;
+              for &b in data {
+                  sum += b;
+              }
+              sum
+          }
+
+          fn main() {
+              let args: Vec<String> = std::env::args().skip(1).collect();
+              println!("args: {args:?}");
+              println!("{}", checksum(b"cargo"));
+          }
+        solution: |
+          fn checksum(data: &[u8]) -> u8 {
+              let mut sum: u8 = 0;
+              for &b in data {
+                  sum = sum.wrapping_add(b);
+              }
+              sum
+          }
+
+          fn main() {
+              let args: Vec<String> = std::env::args().skip(1).collect();
+              println!("args: {args:?}");
+              println!("{}", checksum(b"cargo"));
+          }
+        expected: |
+          args: []
+          12
+        explanation: "cargo run and cargo build use the dev profile, which keeps overflow checks on: 99 + 97 + 114 + 103 + 111 passes 255 and panics with attempt to add with overflow. cargo build --release turns those checks off and silently wraps, so code that relies on wrapping must say so with wrapping_add (or checked_add to detect it). std::env::args() starts with the program path, hence skip(1); here it runs with no arguments, while cargo run -- --verbose would print args: [\"--verbose\"]."
+        hint: u8 has a method that adds modulo 256.
+
+  - id: rust.ownership
+    title: Ownership and moves
+    summary: >
+      Every value has exactly one owner and is dropped when the owner goes out
+      of scope. Assigning or passing a heap-owning value such as String moves
+      it; Copy types such as integers are copied; clone makes a deep copy.
+    level: beginner
+    prereqs: [rust.bindings]
+    lesson:
+      intro: Rust frees memory without a garbage collector by giving every value one owner. When the owner goes out of scope, the value is dropped.
+      example:
+        lang: rust
+        code: |
+          fn take(s: String) -> usize { s.len() }
+
+          fn main() {
+              let a = String::from("hi");
+              let b = a;
+              // println!("{a}");
+              let n = take(b.clone());
+              let k = 7;
+              let j = k;
+              println!("{b} {n} {k} {j}");
+          }
+      steps:
+        - text: A String owns a buffer on the heap. let b = a does not copy that buffer; it moves ownership to b, and a can no longer be used.
+          predict:
+            prompt: What happens if you uncomment println!("{a}")?
+            options:
+              - text: It prints hi
+                explanation: After the move a is no longer valid; Rust does not keep two owners of one buffer.
+              - text: It prints an empty string
+                explanation: Nothing is printed at all, because the program does not compile.
+              - text: "A compile error: borrow of moved value: `a` (E0382)"
+                correct: true
+        - text: Passing a String to a function moves it too. take(b) would consume b; b.clone() makes a deep copy of the buffer and moves the copy, so b stays usable.
+        - text: Integers, bool, char, floats, shared references and tuples or arrays of such types implement Copy. let j = k copies the bits, and both stay usable.
+          predict:
+            prompt: Does let j = k move k?
+            options:
+              - text: Yes, k cannot be used afterwards
+                explanation: i32 is Copy, so assignment copies it instead of moving.
+              - text: No, i32 is Copy, so k is still valid
+                correct: true
+        - text: The program prints hi 2 7 7. When main ends, b is dropped and its buffer freed exactly once, in reverse order of declaration.
+      takeaway: One owner per value; assignment and calls move non-Copy values; use clone for an explicit copy or borrow instead.
+    items:
+      - id: rust.ownership.mcq-use-after-move
+        type: mcq
+        prompt: "let a = String::from(\"hi\"); let b = a; println!(\"{a} {b}\"); What happens?"
+        options:
+          - text: "It does not compile: borrow of moved value: `a` (E0382)"
+            correct: true
+            explanation: let b = a moved the String into b, so a is no longer a valid binding.
+          - text: It prints hi hi
+            misconception: assignment-copies-heap
+            explanation: That would need two owners of one heap buffer, or a hidden deep copy. Rust moves; call clone() when you want a copy.
+          - text: It compiles but panics at run time
+            misconception: ownership-checked-at-runtime
+            explanation: Moves are tracked by the compiler; there is no run-time check.
+        explanation: Moves are checked at compile time, so use-after-free is impossible in safe Rust.
+        hint: Does String implement Copy?
+
+      - id: rust.ownership.multi-copy-types
+        type: multi
+        prompt: Which of these types implement Copy?
+        options:
+          - text: i32
+            correct: true
+          - text: (i32, f64)
+            correct: true
+            explanation: A tuple is Copy when all its parts are.
+          - text: "&str"
+            correct: true
+            explanation: Shared references are Copy; copying one does not copy the text it points to.
+          - text: "[u8; 3]"
+            correct: true
+            explanation: An array of Copy elements is Copy.
+          - text: String
+            misconception: string-is-copy
+            explanation: String owns a heap buffer; copying it implicitly would mean two owners. It moves.
+          - text: Vec<i32>
+            misconception: vec-of-copy-is-copy
+            explanation: Even when the elements are Copy, the Vec owns heap memory, so it moves.
+        explanation: Copy is for types whose bits can be duplicated safely, which excludes anything that owns heap memory.
+        hint: Does the type own memory on the heap?
+
+      - id: rust.ownership.bug-moved-into-fn
+        type: bug
+        prompt: "rustc says: borrow of moved value: `name`. On which line is the moved value used?"
+        code: |
+          fn shout(s: String) -> String {
+              s.to_uppercase()
+          }
+
+          fn main() {
+              let name = String::from("ana");
+              let loud = shout(name);
+              println!("{name} -> {loud}");
+          }
+        bug_line: 8
+        explanation: "Line 7 moves name into shout, and line 8 uses it again. Fix it by borrowing (fn shout(s: &str), call shout(&name)) or by passing name.clone()."
+        hint: Which line reads name after it was given away?
+
+      - id: rust.ownership.output-drop-order
+        type: output
+        prompt: What does this print?
+        code: |
+          struct Noisy(&'static str);
+
+          impl Drop for Noisy {
+              fn drop(&mut self) {
+                  println!("drop {}", self.0);
+              }
+          }
+
+          fn main() {
+              let _a = Noisy("a");
+              let _b = Noisy("b");
+              println!("end");
+          }
+        options:
+          - text: "end\ndrop b\ndrop a"
+            correct: true
+            explanation: Values are dropped when main's scope ends, in reverse order of declaration.
+          - text: "end\ndrop a\ndrop b"
+            misconception: drop-in-declaration-order
+            explanation: Locals are dropped in reverse order, like a stack, so later values (which may depend on earlier ones) go first.
+          - text: "drop a\ndrop b\nend"
+            misconception: drop-after-last-use
+            explanation: A value with a Drop impl lives until the end of its scope, not until its last use.
+        explanation: Drop runs exactly once, when the owner goes out of scope.
+        hint: Think of a stack.
+
+      - id: rust.ownership.code-borrow-instead
+        type: code
+        language: rust
+        prompt: name is moved into shout and cannot be printed afterwards. Change shout to borrow a &str and update the call, without cloning.
+        starter: |
+          fn shout(s: String) -> String {
+              s.to_uppercase()
+          }
+
+          fn main() {
+              let name = String::from("ana");
+              let loud = shout(name);
+              println!("{name} {loud}");
+          }
+        solution: |
+          fn shout(s: &str) -> String {
+              s.to_uppercase()
+          }
+
+          fn main() {
+              let name = String::from("ana");
+              let loud = shout(&name);
+              println!("{name} {loud}");
+          }
+        expected: |
+          ana ANA
+        explanation: Passing a String by value moves ownership into the function, so main may not use name again (E0382, borrow of moved value). A &str parameter only borrows; &name coerces from &String to &str, and the caller keeps ownership.
+        hint: Which parameter type reads text without taking ownership?
+
+  - id: rust.borrowing
+    title: Borrowing and references
+    summary: >
+      &T borrows a value without taking ownership; &mut T borrows it to
+      change it. At any moment you may have many & references or one &mut, and
+      a borrow ends at its last use.
+    level: beginner
+    prereqs: [rust.ownership]
+    lesson:
+      intro: Moving values into every function would be tiring. A reference lets a function use a value while the caller keeps owning it.
+      example:
+        lang: rust
+        code: |
+          fn len(s: &String) -> usize { s.len() }
+          fn push_bang(s: &mut String) { s.push('!'); }
+
+          fn main() {
+              let mut s = String::from("hey");
+              let n = len(&s);
+              push_bang(&mut s);
+              let r1 = &s;
+              let r2 = &s;
+              println!("{n} {r1} {r2}");
+              let w = &mut s;
+              w.push('?');
+              println!("{s}");
+          }
+      steps:
+        - text: "&s creates a shared reference. len reads through it and s is still owned by main afterwards. &mut s creates a mutable reference, which needs let mut s."
+        - text: "The rule: either any number of & references or exactly one &mut, never both at once. r1 and r2 can coexist, so the line prints 3 hey! hey!."
+        - text: A borrow lasts until its last use, not until the end of the block. r1 and r2 are last used in the println!, so taking &mut s afterwards is fine. The last line prints hey!?.
+          predict:
+            prompt: What if println!("{r1}") were added after w.push('?')?
+            options:
+              - text: It prints hey!? twice
+                explanation: r1 would still be alive while w mutates s, which the rules forbid.
+              - text: "A compile error: cannot borrow `s` as mutable because it is also borrowed as immutable (E0502)"
+                correct: true
+              - text: r1 prints the old value hey!
+                explanation: References never hold a snapshot; they point at the live value, which is why the overlap is rejected.
+        - text: The rule prevents data races and dangling pointers. A Vec push may reallocate, which would leave an existing &v[0] pointing at freed memory; the compiler refuses that program.
+      takeaway: Many & or one &mut at a time; a borrow ends at its last use; the owner stays the owner.
+    items:
+      - id: rust.borrowing.bug-push-while-borrowed
+        type: bug
+        prompt: "rustc reports E0502: cannot borrow `v` as mutable because it is also borrowed as immutable. Which line takes the conflicting mutable borrow?"
+        code: |
+          fn main() {
+              let mut v = vec![1, 2, 3];
+              let first = &v[0];
+              v.push(4);
+              println!("{first}");
+          }
+        bug_line: 4
+        explanation: push needs &mut v while first (a & borrow) is still used on line 5. push can reallocate the buffer and leave first dangling. Copy the value (let first = v[0];) or print before pushing.
+        hint: Which call needs to change v?
+
+      - id: rust.borrowing.output-borrow-ends
+        type: output
+        prompt: What does this print?
+        code: |
+          fn main() {
+              let mut s = String::from("a");
+              let r = &s;
+              println!("{r}");
+              s.push('b');
+              println!("{s}");
+          }
+        options:
+          - text: "a\nab"
+            correct: true
+            explanation: r is last used on line 4, so its borrow is over before s.push needs &mut s.
+          - text: It does not compile
+            misconception: borrow-lasts-whole-scope
+            explanation: Borrows end at their last use (non-lexical lifetimes), not at the closing brace.
+          - text: "ab\nab"
+            misconception: println-is-deferred
+            explanation: println! prints immediately, before the push happens.
+        explanation: Reorder code so a borrow is finished before you mutate.
+        hint: When is r used for the last time?
+
+      - id: rust.borrowing.cloze-mut-ref
+        type: cloze
+        prompt: "Complete the parameter type so the function can change the caller's integer: fn add_one(x: ___ i32) { *x += 1; }"
+        answers: ["&mut"]
+        explanation: "&mut i32 is a mutable reference; *x dereferences it to change the caller's value. The caller passes add_one(&mut n)."
+        hint: A shared reference cannot be written through.
+
+      - id: rust.borrowing.multi-rules
+        type: multi
+        prompt: Which statements about references in safe Rust are true?
+        options:
+          - text: You can hold several &T to the same value at the same time
+            correct: true
+          - text: While a &mut T is in use, no other reference to that value may be used
+            correct: true
+          - text: A reference can never outlive the value it points to
+            correct: true
+            explanation: The compiler rejects such programs, so dangling references cannot exist.
+          - text: Taking &mut x requires x to be declared with let mut
+            correct: true
+            explanation: Otherwise rustc reports E0596, cannot borrow as mutable.
+          - text: Two &mut to the same value are fine if they are used on different lines
+            misconception: two-mut-refs-ok
+            explanation: Two live &mut borrows are E0499, cannot borrow as mutable more than once at a time.
+          - text: Passing &s to a function moves s into it
+            misconception: borrow-moves
+            explanation: Borrowing never transfers ownership; s is still owned by the caller.
+        explanation: Aliasing XOR mutation is the core rule behind Rust's memory and thread safety.
+        hint: Shared or exclusive, never both.
+
+      - id: rust.borrowing.code-copy-before-mut
+        type: code
+        language: rust
+        prompt: first still borrows scores while add_bonus needs a mutable borrow. Keep the value of the first score instead of a reference to it.
+        starter: |
+          fn add_bonus(scores: &mut Vec<i32>, bonus: i32) {
+              for s in scores.iter_mut() {
+                  *s += bonus;
+              }
+          }
+
+          fn main() {
+              let mut scores = vec![10, 20];
+              let first = &scores[0];
+              add_bonus(&mut scores, 5);
+              println!("first was {first}, now {scores:?}");
+          }
+        solution: |
+          fn add_bonus(scores: &mut Vec<i32>, bonus: i32) {
+              for s in scores.iter_mut() {
+                  *s += bonus;
+              }
+          }
+
+          fn main() {
+              let mut scores = vec![10, 20];
+              let first = scores[0];
+              add_bonus(&mut scores, 5);
+              println!("first was {first}, now {scores:?}");
+          }
+        expected: |
+          first was 10, now [15, 25]
+        explanation: While a shared reference is still used later, no mutable borrow of the same data may exist (E0502). i32 is Copy, so scores[0] copies the number out and ends the borrow at once; the mutable borrow by add_bonus is then the only one.
+        hint: i32 is Copy — do you need a reference at all?
+
+  - id: rust.slices-strings
+    title: Slices, String and &str
+    summary: >
+      String owns growable UTF-8 text; &str borrows a view into text. A slice
+      &v[a..b] borrows part of an array or Vec, end excluded. len() counts
+      bytes, and strings cannot be indexed by integer.
+    level: beginner
+    prereqs: [rust.borrowing]
+    lesson:
+      intro: Rust has two main string types. String owns its text on the heap; &str is a borrowed view of text that lives somewhere else.
+      example:
+        lang: rust
+        code: |
+          fn first_word(s: &str) -> &str {
+              s.split(' ').next().unwrap_or("")
+          }
+          fn main() {
+              let owned = String::from("hola mundo");
+              let lit: &str = "adiós";
+              println!("{}", first_word(&owned));
+              println!("{}", first_word(lit));
+              println!("{} {}", lit.len(), lit.chars().count());
+              let nums = [10, 20, 30, 40];
+              let mid = &nums[1..3];
+              println!("{mid:?}");
+          }
+      steps:
+        - text: A &str is a pointer plus a length. String literals are &'static str baked into the binary. first_word returns a slice of its input, without copying.
+        - text: "&owned is a &String, and Rust coerces it to &str automatically. So a &str parameter accepts both a String (borrowed) and a literal. Prints hola, then adiós."
+        - text: Strings are UTF-8. len() counts bytes, and ó takes two bytes.
+          predict:
+            prompt: What does lit.len(), lit.chars().count() print for "adiós"?
+            options:
+              - text: 5 5
+                explanation: len() is bytes, not characters, and ó is two bytes in UTF-8.
+              - text: 6 5
+                correct: true
+              - text: 6 6
+                explanation: chars() yields Unicode scalar values, and ó is one of them.
+        - text: "Byte ranges must fall on character boundaries. &lit[0..4] panics at run time: end byte index 4 is not a char boundary; it is inside 'ó'. And s[0] does not compile at all: the type `str` cannot be indexed by `{integer}`."
+        - text: "Slices work for arrays and Vecs too. &nums[1..3] borrows indices 1 and 2 (end excluded) and prints [20, 30]."
+      takeaway: Take &str parameters, own text as String; len() is bytes; slice by ranges on char boundaries or iterate with chars().
+    items:
+      - id: rust.slices-strings.output-len-bytes
+        type: output
+        prompt: What does this print?
+        code: |
+          fn main() {
+              let s = "señor";
+              println!("{} {}", s.len(), s.chars().count());
+          }
+        answers: ["6 5"]
+        explanation: ñ is two bytes in UTF-8, so len() (bytes) is 6 while there are 5 chars.
+        hint: len() does not count characters.
+
+      - id: rust.slices-strings.mcq-param-type
+        type: mcq
+        prompt: A function only reads some text. Which parameter type lets callers pass both a String and a string literal?
+        options:
+          - text: "s: &str"
+            correct: true
+            explanation: "&String coerces to &str, and literals already are &str."
+          - text: "s: &String"
+            misconception: string-ref-accepts-literal
+            explanation: A literal is a &str, and passing it is E0308 mismatched types (expected &String, found &str).
+          - text: "s: String"
+            misconception: take-ownership-to-read
+            explanation: That forces callers to give up (or clone) their String just so you can read it.
+          - text: "s: &mut String"
+            misconception: mut-ref-for-reading
+            explanation: Reading needs no mutable access, and literals cannot be borrowed as &mut String.
+        explanation: Accept the most general borrowed form (&str, &[T]) and let the caller decide what owns the data.
+        hint: Which type do both coerce to?
+
+      - id: rust.slices-strings.mcq-index-string
+        type: mcq
+        prompt: "let s = String::from(\"hello\"); let c = s[0]; What happens?"
+        options:
+          - text: "It does not compile: the type `str` cannot be indexed by `{integer}`"
+            correct: true
+            explanation: A byte position is not a character in UTF-8, so Rust refuses integer indexing. Use s.chars().next(), s.chars().nth(i) or s.as_bytes()[i].
+          - text: c is 'h'
+            misconception: string-index-char
+            explanation: That works in many languages, but Rust forbids it because one character can span several bytes.
+          - text: c is the byte 104
+            misconception: string-index-byte
+            explanation: For bytes you must ask explicitly with s.as_bytes()[0].
+        explanation: Strings can be sliced by byte ranges (&s[0..1]), never indexed by a single integer.
+        hint: What would s[0] mean for "ñ"?
+
+      - id: rust.slices-strings.output-array-slices
+        type: output
+        prompt: What does this print?
+        code: |
+          fn main() {
+              let a = [1, 2, 3, 4, 5];
+              let s = &a[1..4];
+              let t = &a[..2];
+              println!("{:?} {:?} {}", s, t, s.len());
+          }
+        options:
+          - text: "[2, 3, 4] [1, 2] 3"
+            correct: true
+            explanation: 1..4 is indices 1, 2, 3 (end excluded); ..2 starts at 0.
+          - text: "[2, 3, 4, 5] [1, 2, 3] 4"
+            misconception: range-end-inclusive
+            explanation: a..b excludes b. Write 1..=4 to include it.
+          - text: "[1, 2, 3, 4] [1, 2] 4"
+            misconception: index-from-one
+            explanation: Indices start at 0, so index 1 is the second element.
+        explanation: A slice is a borrowed view (pointer + length) into the array; nothing is copied.
+        hint: Is the end of a range included?
+
+      - id: rust.slices-strings.code-char-boundary
+        type: code
+        language: rust
+        prompt: initial should return the first character of a name as a &str slice. It panics on ñandú; slice at a character boundary instead of byte 1.
+        starter: |
+          fn initial(name: &str) -> &str {
+              &name[..1]
+          }
+
+          fn main() {
+              for name in ["ana", "ñandú"] {
+                  println!("{}", initial(name));
+              }
+          }
+        solution: |
+          fn initial(name: &str) -> &str {
+              match name.chars().next() {
+                  Some(c) => &name[..c.len_utf8()],
+                  None => "",
+              }
+          }
+
+          fn main() {
+              for name in ["ana", "ñandú"] {
+                  println!("{}", initial(name));
+              }
+          }
+        expected: |
+          a
+          ñ
+        explanation: String slices index bytes of UTF-8, and ñ takes 2 bytes, so &name[..1] cuts a character in half and panics (byte index 1 is not a char boundary). chars() decodes characters; len_utf8() tells how many bytes the first one takes, giving a valid slice of the original string.
+        hint: How many bytes does the first char take?
+
+  - id: rust.structs-enums
+    title: Structs, enums and match
+    summary: >
+      Structs group named fields; enum variants can each carry different data.
+      impl blocks hold methods. match must cover every variant, and patterns
+      bind the data inside.
+    level: beginner
+    prereqs: [rust.ownership]
+    lesson:
+      intro: A struct says "all of these"; an enum says "exactly one of these", and each variant may carry its own data. match takes them apart.
+      example:
+        lang: rust
+        code: |
+          struct Item { name: String, shape: Shape }
+          enum Shape { Square(u32), Rect { w: u32, h: u32 }, Dot }
+          impl Shape {
+              fn area(&self) -> u32 {
+                  match self {
+                      Shape::Square(s) => s * s,
+                      Shape::Rect { w, h } => w * h,
+                      Shape::Dot => 0,
+                  }
+              }
+          }
+          fn main() {
+              let it = Item { name: String::from("tile"), shape: Shape::Rect { w: 2, h: 3 } };
+              println!("{} {} {}", it.name, it.shape.area(), Shape::Square(4).area());
+          }
+      steps:
+        - text: "Item is a struct with named fields. Shape has three variants: a tuple-like one, a struct-like one and a unit one with no data."
+        - text: "impl Shape adds methods. &self borrows the value, so area() can be called without giving the shape away."
+        - text: Each match arm is a pattern. Shape::Rect { w, h } binds the two fields so the arm can use them.
+          predict:
+            prompt: What does the program print?
+            options:
+              - text: tile 6 16
+                correct: true
+              - text: tile 5 8
+                explanation: The arms multiply, w * h and s * s.
+              - text: tile 6 4
+                explanation: Square(s) computes s * s, so Square(4) is 16.
+        - text: "match must be exhaustive. Delete the Dot arm and rustc refuses: error[E0004]: non-exhaustive patterns: `&Shape::Dot` not covered. Adding a variant later makes the compiler list every match to update."
+        - text: Use _ => ... as a catch-all, and if let Shape::Square(s) = shape { ... } when only one pattern matters.
+      takeaway: Model "one of these" with enums, add behaviour with impl, and let exhaustive match catch forgotten cases.
+    items:
+      - id: rust.structs-enums.output-match-guards
+        type: output
+        prompt: What does this print?
+        code: |
+          fn classify(n: i32) -> &'static str {
+              match n {
+                  0 => "zero",
+                  x if x < 0 => "negative",
+                  1..=9 => "digit",
+                  _ => "big",
+              }
+          }
+
+          fn main() {
+              println!("{} {} {} {}", classify(-3), classify(0), classify(7), classify(42));
+          }
+        answers: ["negative zero digit big"]
+        explanation: Arms are tried top to bottom. x if x < 0 is a guard, 1..=9 an inclusive range, and _ catches the rest.
+        hint: The first matching arm wins.
+
+      - id: rust.structs-enums.bug-non-exhaustive
+        type: bug
+        prompt: "rustc rejects this with E0004: non-exhaustive patterns: `Light::Yellow` not covered. Which line does it point at?"
+        code: |
+          enum Light { Red, Yellow, Green }
+
+          fn next(l: Light) -> Light {
+              match l {
+                  Light::Red => Light::Green,
+                  Light::Green => Light::Yellow,
+              }
+          }
+          fn main() { let _ = next(Light::Red); }
+        bug_line: 4
+        explanation: The error points at the match expression, which lacks an arm for Light::Yellow. Add Light::Yellow => Light::Red.
+        hint: The problem is the match as a whole, not any arm in it.
+
+      - id: rust.structs-enums.cloze-derive-debug
+        type: cloze
+        prompt: "println!(\"{:?}\", p) on a struct fails with `P` doesn't implement `Debug`. Add above the struct: #[derive(___)]"
+        answers: ["Debug"]
+        case_sensitive: true
+        explanation: "derive(Debug) generates the formatting used by {:?}. {} needs a hand-written impl of std::fmt::Display."
+        hint: The error message names the trait.
+
+      - id: rust.structs-enums.parsons-method
+        type: parsons
+        prompt: Order the lines of a method that increments a counter and returns the new value.
+        lines:
+          - "impl Counter {"
+          - "    fn tick(&mut self) -> u32 {"
+          - "        self.n += 1;"
+          - "        self.n"
+          - "    }"
+          - "}"
+        explanation: "&mut self lets the method change the field. The last expression without a semicolon is the return value."
+        hint: Which line has no semicolon?
+
+      - id: rust.structs-enums.code-exhaustive-match
+        type: code
+        language: rust
+        prompt: The match in area does not compile because one variant is missing. Add the arm for Triangle (half of base times height).
+        starter: |
+          enum Shape {
+              Square(u32),
+              Rect { w: u32, h: u32 },
+              Triangle { base: u32, height: u32 },
+          }
+
+          impl Shape {
+              fn area(&self) -> u32 {
+                  match self {
+                      Shape::Square(side) => side * side,
+                      Shape::Rect { w, h } => w * h,
+                  }
+              }
+          }
+
+          fn main() {
+              let shapes = [Shape::Square(3), Shape::Rect { w: 2, h: 5 }, Shape::Triangle { base: 4, height: 3 }];
+              for s in &shapes {
+                  println!("{}", s.area());
+              }
+          }
+        solution: |
+          enum Shape {
+              Square(u32),
+              Rect { w: u32, h: u32 },
+              Triangle { base: u32, height: u32 },
+          }
+
+          impl Shape {
+              fn area(&self) -> u32 {
+                  match self {
+                      Shape::Square(side) => side * side,
+                      Shape::Rect { w, h } => w * h,
+                      Shape::Triangle { base, height } => base * height / 2,
+                  }
+              }
+          }
+
+          fn main() {
+              let shapes = [Shape::Square(3), Shape::Rect { w: 2, h: 5 }, Shape::Triangle { base: 4, height: 3 }];
+              for s in &shapes {
+                  println!("{}", s.area());
+              }
+          }
+        expected: |
+          9
+          10
+          6
+        explanation: match must be exhaustive; leaving out a variant is error E0004, which is how Rust makes you handle a new variant everywhere. Patterns destructure tuple variants (Square(side)) and struct variants ({ base, height }) into references to their fields.
+        hint: Struct-like variants are matched with braces and field names.
+
+  - id: rust.option-result
+    title: Option, Result and ?
+    summary: >
+      Rust has no null. Option<T> is Some(value) or None; Result<T, E> is
+      Ok(value) or Err(error). The ? operator returns early with the None or
+      Err, and only works in functions that return Option or Result.
+    level: intermediate
+    prereqs: [rust.structs-enums]
+    lesson:
+      intro: Missing values and failures are ordinary enums in Rust, so the compiler makes you handle them before you can use the value inside.
+      example:
+        lang: rust
+        code: |
+          use std::num::ParseIntError;
+
+          fn parse_sum(a: &str, b: &str) -> Result<i32, ParseIntError> {
+              let x: i32 = a.trim().parse()?;
+              let y: i32 = b.trim().parse()?;
+              Ok(x + y)
+          }
+          fn main() {
+              let v = vec![3, 8];
+              println!("{:?} {:?}", v.get(1), v.get(5));
+              println!("{}", v.get(5).copied().unwrap_or(0));
+              println!("{:?}", parse_sum("2", " 40 "));
+              println!("{:?}", parse_sum("2", "x"));
+          }
+      steps:
+        - text: v.get(i) returns Option<&i32> instead of panicking. The first line prints Some(8) None.
+        - text: You cannot add an Option<&i32> to a number; you must take the value out. unwrap_or(0) gives the value or a default, so the second line prints 0. unwrap() would panic on None.
+        - text: parse returns Result<i32, ParseIntError>. The ? after it means "if this is Err, return that Err from parse_sum now; otherwise give me the Ok value".
+          predict:
+            prompt: What does parse_sum("2", "x") return?
+            options:
+              - text: Ok(2)
+                explanation: "? does not skip failures; it returns the error to the caller."
+              - text: "Err(ParseIntError { kind: InvalidDigit })"
+                correct: true
+              - text: It panics
+                explanation: "? returns the error as a value; only unwrap or expect would panic."
+        - text: "The good case prints Ok(42). ? only works inside a function that returns Result or Option; in a plain fn main() it is error E0277: the `?` operator can only be used in a function that returns `Result` or `Option`."
+      takeaway: Option replaces null, Result replaces exceptions; ? propagates the failure, unwrap turns it into a panic.
+    items:
+      - id: rust.option-result.output-question-option
+        type: output
+        prompt: What does this print?
+        code: |
+          fn half(n: i32) -> Option<i32> {
+              if n % 2 == 0 { Some(n / 2) } else { None }
+          }
+
+          fn quarter(n: i32) -> Option<i32> {
+              let h = half(n)?;
+              half(h)
+          }
+
+          fn main() {
+              println!("{:?} {:?} {:?}", quarter(12), quarter(6), quarter(5));
+          }
+        options:
+          - text: Some(3) None None
+            correct: true
+            explanation: 12 → 6 → 3. 6 → 3, and half(3) is None. 5 is odd, so ? returns None at once.
+          - text: Some(3) Some(1) None
+            misconception: integer-division-rounds-ok
+            explanation: half(3) returns None because 3 is odd; it does not compute 3 / 2.
+          - text: Some(3) None, then a panic on quarter(5)
+            misconception: question-mark-panics
+            explanation: "? on None returns None from the function; nothing panics."
+        explanation: "? on Option works like on Result, short-circuiting with None."
+        hint: Is 3 even?
+
+      - id: rust.option-result.mcq-question-mark
+        type: mcq
+        prompt: "Inside fn load() -> Result<Config, MyError>, what does let text = read_file()?; do when read_file returns Err(e)?"
+        options:
+          - text: Returns Err from load right away, converting e with From into MyError
+            correct: true
+            explanation: "? is early return plus From::from on the error."
+          - text: Panics with the error message
+            misconception: question-mark-panics
+            explanation: That is unwrap or expect. ? hands the error to the caller.
+          - text: Sets text to a default value and continues
+            misconception: question-mark-defaults
+            explanation: Use unwrap_or or unwrap_or_default for a fallback.
+          - text: Ignores the error and retries read_file
+            misconception: question-mark-retries
+            explanation: "? never retries anything."
+        explanation: "? keeps the happy path flat while every failure still reaches the caller."
+        hint: The function's return type matters.
+
+      - id: rust.option-result.bug-question-in-main
+        type: bug
+        prompt: "This fails with E0277 (the `?` operator can only be used in a function that returns `Result` or `Option`). Which line must change so it compiles while keeping the ?"
+        code: |
+          use std::fs;
+
+          fn main() {
+              let text = fs::read_to_string("config.toml")?;
+              println!("{}", text.len());
+          }
+        bug_line: 3
+        explanation: "The ? on line 4 is fine; main's signature is not. fn main() -> Result<(), std::io::Error> (and Ok(()) at the end) lets ? propagate the error."
+        hint: Where does ? send the error?
+
+      - id: rust.option-result.multi-returns-option
+        type: multi
+        prompt: Which of these return an Option?
+        options:
+          - text: v.get(i) on a Vec
+            correct: true
+          - text: it.next() on an iterator
+            correct: true
+            explanation: None means the iterator is exhausted.
+          - text: map.get(&k) on a HashMap
+            correct: true
+          - text: "\"abc\".find('b')"
+            correct: true
+            explanation: It returns Some(byte index) or None.
+          - text: "\"42\".parse::<i32>()"
+            misconception: parse-returns-option
+            explanation: Parsing can fail for a reason, so it returns Result<i32, ParseIntError>.
+          - text: std::fs::File::open(path)
+            misconception: io-returns-option
+            explanation: I/O returns Result<File, std::io::Error> so you can see why it failed.
+        explanation: Option means "maybe absent"; Result means "may fail, and here is why".
+        hint: Is there an error to report, or just nothing?
+
+      - id: rust.option-result.code-question-mark
+        type: code
+        language: rust
+        prompt: sum panics on bad input instead of returning the error. Propagate the parse error with ?.
+        starter: |
+          use std::num::ParseIntError;
+
+          fn sum(text: &str) -> Result<i32, ParseIntError> {
+              let mut total = 0;
+              for part in text.split(',') {
+                  total += part.trim().parse::<i32>().unwrap();
+              }
+              Ok(total)
+          }
+
+          fn main() {
+              for input in ["1, 2, 3", "4, x"] {
+                  match sum(input) {
+                      Ok(n) => println!("{input} = {n}"),
+                      Err(e) => println!("{input}: {e}"),
+                  }
+              }
+          }
+        solution: |
+          use std::num::ParseIntError;
+
+          fn sum(text: &str) -> Result<i32, ParseIntError> {
+              let mut total = 0;
+              for part in text.split(',') {
+                  total += part.trim().parse::<i32>()?;
+              }
+              Ok(total)
+          }
+
+          fn main() {
+              for input in ["1, 2, 3", "4, x"] {
+                  match sum(input) {
+                      Ok(n) => println!("{input} = {n}"),
+                      Err(e) => println!("{input}: {e}"),
+                  }
+              }
+          }
+        expected: |
+          1, 2, 3 = 6
+          4, x: invalid digit found in string
+        explanation: unwrap turns an Err into a panic that stops the program. ? returns the Err from sum early (the function already returns Result<_, ParseIntError>) and unwraps the Ok value otherwise, so the caller decides what to do with the error.
+        hint: Replace unwrap with one character.
+
+  - id: rust.collections
+    title: Vec and HashMap
+    summary: >
+      Vec<T> is a growable array; indexing out of range panics, get returns
+      Option. HashMap<K, V> gives average O(1) lookups with unspecified
+      iteration order; the entry API updates in place.
+    level: intermediate
+    prereqs: [rust.borrowing, rust.option-result, logic.hashing]
+    lesson:
+      intro: Vec and HashMap cover most day-to-day data. Each has a panicking access and a safe one that returns Option.
+      example:
+        lang: rust
+        code: |
+          use std::collections::HashMap;
+
+          fn main() {
+              let mut v: Vec<i32> = Vec::new();
+              v.push(3); v.push(1); v.push(2);
+              v.sort();
+              println!("{:?} {} {:?}", v, v.len(), v.get(10));
+              let text = "the cat the dog the end";
+              let mut counts: HashMap<&str, i32> = HashMap::new();
+              for w in text.split_whitespace() {
+                  *counts.entry(w).or_insert(0) += 1;
+              }
+              println!("{} {:?}", counts["the"], counts.get("cow"));
+          }
+      steps:
+        - text: push appends in amortized O(1); when the buffer is full the Vec reallocates. sort sorts in place, so the first line prints [1, 2, 3] 3 None.
+        - text: v[10] would compile but panic at run time with index out of bounds; the len is 3 but the index is 10. get(10) returns None instead.
+          predict:
+            prompt: What does v[10] do on a Vec of length 3?
+            options:
+              - text: Returns None
+                explanation: Only get returns an Option; indexing returns the element itself, so it must panic.
+              - text: Reads whatever memory is there
+                explanation: Safe Rust always checks bounds.
+              - text: Panics at run time
+                correct: true
+        - text: "entry(w) finds or creates the slot for w; or_insert(0) puts 0 there if it was empty and returns &mut i32, and *... += 1 adds one. counts[\"the\"] is 3."
+        - text: counts["cow"] would panic (no entry found for key); get("cow") returns None. Keys must implement Eq and Hash.
+        - text: Iterating a HashMap visits keys in an unspecified order that can change between runs. Use BTreeMap when you need keys sorted.
+      takeaway: Index when absence is a bug, use get when it is expected; entry for counters; HashMap order is unspecified.
+    items:
+      - id: rust.collections.output-entry-count
+        type: output
+        prompt: What does this print?
+        code: |
+          use std::collections::HashMap;
+
+          fn main() {
+              let mut m = HashMap::new();
+              for c in "banana".chars() {
+                  *m.entry(c).or_insert(0) += 1;
+              }
+              println!("{} {} {}", m[&'a'], m[&'n'], m.get(&'z').is_none());
+          }
+        answers: ["3 2 true"]
+        explanation: banana has three a and two n. 'z' was never inserted, so get returns None.
+        hint: Count the letters.
+
+      - id: rust.collections.mcq-hashmap-order
+        type: mcq
+        prompt: You insert "one", "two", "three" into a HashMap and print m.keys(). In what order do they come out?
+        options:
+          - text: An unspecified order, which may differ from one run to the next
+            correct: true
+            explanation: HashMap uses a randomly seeded hasher (against hash-flooding attacks), so iteration order is arbitrary.
+          - text: Insertion order
+            misconception: hashmap-insertion-order
+            explanation: Python dicts keep insertion order; Rust's HashMap does not. The indexmap crate does.
+          - text: Sorted by key
+            misconception: hashmap-sorted
+            explanation: That is BTreeMap.
+        explanation: Never rely on HashMap order in output or tests; sort the keys or use BTreeMap.
+        hint: Which map type is ordered?
+
+      - id: rust.collections.mcq-index-out-of-bounds
+        type: mcq
+        prompt: "let v = vec![1, 2, 3]; println!(\"{}\", v[10]); What happens?"
+        options:
+          - text: "It compiles and panics: index out of bounds: the len is 3 but the index is 10"
+            correct: true
+            explanation: Indexing a Vec is bounds-checked at run time.
+          - text: It does not compile
+            misconception: index-checked-at-compile-time
+            explanation: The length of a Vec is only known at run time, so the compiler cannot reject this.
+          - text: It prints None
+            misconception: index-returns-option
+            explanation: v[i] returns the element; v.get(i) returns an Option.
+          - text: It prints a garbage value
+            misconception: rust-index-unchecked
+            explanation: Safe Rust never reads out of bounds.
+        explanation: A panic is safe (no memory is corrupted) but still a crash; use get when an index may be missing.
+        hint: When is the length of a Vec known?
+
+      - id: rust.collections.cloze-hashset
+        type: cloze
+        prompt: "Keep unique ids with average O(1) membership tests and no ordering: let mut seen = std::collections::___::new();"
+        answers: ["HashSet"]
+        case_sensitive: true
+        explanation: HashSet<T> is a HashMap with only keys. insert returns false when the value was already there.
+        hint: A set built on hashing.
+
+      - id: rust.collections.code-entry-count
+        type: code
+        language: rust
+        prompt: Count how often each word appears. insert overwrites the count; use the entry API instead.
+        starter: |
+          use std::collections::HashMap;
+
+          fn main() {
+              let text = "b a b c a b";
+              let mut counts: HashMap<&str, i32> = HashMap::new();
+              for word in text.split_whitespace() {
+                  counts.insert(word, 1);
+              }
+              let mut pairs: Vec<_> = counts.into_iter().collect();
+              pairs.sort();
+              println!("{pairs:?}");
+          }
+        solution: |
+          use std::collections::HashMap;
+
+          fn main() {
+              let text = "b a b c a b";
+              let mut counts: HashMap<&str, i32> = HashMap::new();
+              for word in text.split_whitespace() {
+                  *counts.entry(word).or_insert(0) += 1;
+              }
+              let mut pairs: Vec<_> = counts.into_iter().collect();
+              pairs.sort();
+              println!("{pairs:?}");
+          }
+        expected: |
+          [("a", 2), ("b", 3), ("c", 1)]
+        explanation: entry(word) finds the slot for the key, or_insert(0) fills a missing one, and it returns &mut i32 that * lets you increment in place. A HashMap's iteration order is unspecified and changes between runs, so the pairs are collected into a Vec and sorted before printing.
+        hint: "*map.entry(key).or_insert(0) += 1"
+
+  - id: rust.traits-generics
+    title: Traits and generics
+    summary: >
+      A trait is a set of methods a type promises to provide, optionally with
+      default bodies. Generic functions name trait bounds (T: Display) and are
+      compiled once per concrete type; dyn Trait dispatches at run time.
+    level: intermediate
+    prereqs: [rust.structs-enums]
+    lesson:
+      intro: Traits describe what a type can do. Generics let one function work for every type that can do it, checked at compile time.
+      example:
+        lang: rust
+        code: |
+          trait Describe {
+              fn name(&self) -> String;
+              fn describe(&self) -> String { format!("<{}>", self.name()) }
+          }
+          struct Cat;
+          impl Describe for Cat { fn name(&self) -> String { "cat".into() } }
+
+          fn largest<T: PartialOrd + Copy>(xs: &[T]) -> T {
+              let mut m = xs[0];
+              for &x in xs { if x > m { m = x; } }
+              m
+          }
+          fn show(x: impl std::fmt::Display) -> String { format!("[{x}]") }
+          fn main() { println!("{} {} {}", Cat.describe(), largest(&[3, 9, 2]), show(1.5)); }
+      steps:
+        - text: Describe requires name and provides describe by default. impl Describe for Cat only writes name, and Cat.describe() returns <cat>.
+        - text: "largest is generic over T, and the bounds say what it needs: PartialOrd for >, Copy to copy xs[0] out of the slice."
+          predict:
+            prompt: What happens if you drop the Copy bound?
+            options:
+              - text: It still compiles; integers are Copy anyway
+                explanation: Generic code is checked against its bounds, not against the types you happen to call it with.
+              - text: "A compile error: cannot move out of type `[T]`, a non-copy slice (E0508)"
+                correct: true
+              - text: It compiles but panics when T is a String
+                explanation: Trait bounds are checked at compile time; no run-time surprise is possible.
+        - text: The compiler generates a separate largest for each concrete T used (monomorphization). Calls are static and can be inlined, at the cost of larger binaries.
+        - text: "impl Display in argument position is shorthand for a generic parameter with that bound. The line prints <cat> 9 [1.5]."
+        - text: "When the type is known only at run time, use a trait object: Vec<Box<dyn Describe>> holds different types and calls through a vtable. You may implement a trait for a type only if the trait or the type is defined in your crate (the orphan rule, E0117)."
+      takeaway: Traits define behaviour, bounds state what generic code needs, generics dispatch statically and dyn Trait dynamically.
+    items:
+      - id: rust.traits-generics.output-default-method
+        type: output
+        prompt: What does this print?
+        code: |
+          trait Greet {
+              fn name(&self) -> String;
+              fn hello(&self) -> String { format!("hello, {}", self.name()) }
+          }
+          struct En;
+          struct Es;
+          impl Greet for En { fn name(&self) -> String { "Ann".into() } }
+          impl Greet for Es {
+              fn name(&self) -> String { "Eva".into() }
+              fn hello(&self) -> String { format!("hola, {}", self.name()) }
+          }
+
+          fn main() {
+              let all: Vec<Box<dyn Greet>> = vec![Box::new(En), Box::new(Es)];
+              for g in &all { println!("{}", g.hello()); }
+          }
+        answers: ["hello, Ann\nhola, Eva"]
+        explanation: En uses the default hello; Es overrides it. The calls go through dyn Greet, so each element runs its own type's method.
+        hint: Which type overrides the default?
+
+      - id: rust.traits-generics.bug-missing-bound
+        type: bug
+        prompt: "rustc reports E0277: `T` doesn't implement `std::fmt::Display`. Which line needs a change so it compiles?"
+        code: |
+          fn print_all<T>(items: &[T]) {
+              for it in items {
+                  println!("{it}");
+              }
+          }
+          fn main() { print_all(&[1, 2]); }
+        bug_line: 1
+        explanation: "The error is reported inside println!, but the fix is the signature: fn print_all<T: std::fmt::Display>(items: &[T]). A generic body may only use what its bounds promise."
+        hint: Where does a generic function say what T can do?
+
+      - id: rust.traits-generics.mcq-dispatch
+        type: mcq
+        prompt: "Compare fn a<T: Shape>(s: &T) and fn b(s: &dyn Shape). Which statement is true?"
+        options:
+          - text: a is compiled once per concrete type (static dispatch); b is compiled once and calls through a vtable (dynamic dispatch)
+            correct: true
+            explanation: Generics are monomorphized; trait objects carry a pointer to a table of methods.
+          - text: Both are the same; dyn is just older syntax
+            misconception: dyn-equals-generic
+            explanation: They compile to different code. Only impl Trait in argument position is shorthand for a generic.
+          - text: b is checked at run time, so it can accept types that do not implement Shape
+            misconception: dyn-unchecked
+            explanation: Only types that implement Shape can be turned into &dyn Shape; that is checked at compile time.
+        explanation: Pick generics for speed and inlining, dyn for heterogeneous collections and smaller code.
+        hint: Which one needs to know the concrete type at compile time?
+
+      - id: rust.traits-generics.cloze-dyn
+        type: cloze
+        prompt: "A Vec that holds different shape types behind one trait: let shapes: Vec<Box<___ Shape>> = vec![Box::new(Circle), Box::new(Square)];"
+        answers: ["dyn"]
+        case_sensitive: true
+        explanation: Box<dyn Shape> is a trait object; each element can be a different type implementing Shape.
+        hint: The keyword for a trait object.
+
+      - id: rust.traits-generics.code-trait-bound
+        type: code
+        language: rust
+        prompt: report cannot call describe on an arbitrary T. Add the trait bound it needs.
+        starter: |
+          trait Describe {
+              fn describe(&self) -> String;
+          }
+
+          struct Dog;
+          struct Robot {
+              id: u32,
+          }
+
+          impl Describe for Dog {
+              fn describe(&self) -> String {
+                  "dog".to_string()
+              }
+          }
+
+          impl Describe for Robot {
+              fn describe(&self) -> String {
+                  format!("robot #{}", self.id)
+              }
+          }
+
+          fn report<T>(items: &[T]) -> String {
+              items.iter().map(|i| i.describe()).collect::<Vec<_>>().join(", ")
+          }
+
+          fn main() {
+              println!("{}", report(&[Dog, Dog]));
+              println!("{}", report(&[Robot { id: 7 }]));
+          }
+        solution: |
+          trait Describe {
+              fn describe(&self) -> String;
+          }
+
+          struct Dog;
+          struct Robot {
+              id: u32,
+          }
+
+          impl Describe for Dog {
+              fn describe(&self) -> String {
+                  "dog".to_string()
+              }
+          }
+
+          impl Describe for Robot {
+              fn describe(&self) -> String {
+                  format!("robot #{}", self.id)
+              }
+          }
+
+          fn report<T: Describe>(items: &[T]) -> String {
+              items.iter().map(|i| i.describe()).collect::<Vec<_>>().join(", ")
+          }
+
+          fn main() {
+              println!("{}", report(&[Dog, Dog]));
+              println!("{}", report(&[Robot { id: 7 }]));
+          }
+        expected: |
+          dog, dog
+          robot #7
+        explanation: "A generic function may only use what its bounds promise; with no bound, T has no describe method (E0599). T: Describe (or where T: Describe) restricts T to types that implement the trait, and the compiler generates a version of report for Dog and another for Robot."
+        hint: "fn report<T: ...>"
+
+  - id: rust.lifetimes
+    title: Lifetimes
+    summary: >
+      A lifetime annotation ('a) names how long a reference stays valid and
+      relates the lifetimes of inputs and outputs. Annotations never extend a
+      value's life; they let the compiler reject dangling references.
+    level: advanced
+    prereqs: [rust.slices-strings, rust.traits-generics]
+    lesson:
+      intro: When a function returns a reference, the compiler must know which input it borrows from, so it can check that the result is not used after that input is gone.
+      example:
+        lang: rust
+        code: |
+          fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {
+              if a.len() >= b.len() { a } else { b }
+          }
+          struct Excerpt<'a> { part: &'a str }
+          fn main() {
+              let text = String::from("Call me. Later.");
+              let ex = Excerpt { part: text.split('.').next().unwrap() };
+              let outer = String::from("hi");
+              let res;
+              {
+                  let inner = String::from("hello");
+                  res = longest(&outer, &inner);
+                  println!("{} | {}", ex.part, res);
+              }
+          }
+      steps:
+        - text: "Without <'a>, fn longest(a: &str, b: &str) -> &str fails with E0106, missing lifetime specifier: the result could come from a or from b."
+        - text: "'a says the result is valid only as long as both inputs are, in practice the shorter of the two. Annotations describe a relationship; they never make anything live longer."
+        - text: Here res is used inside the block while inner is alive, so it compiles and prints Call me | hello.
+          predict:
+            prompt: What if println!("{res}") moved after the inner block?
+            options:
+              - text: It prints hello
+                explanation: inner is dropped at the end of the block, and res may point into it.
+              - text: "A compile error: `inner` does not live long enough (E0597)"
+                correct: true
+              - text: It prints hi, because outer lives longer
+                explanation: The compiler does not look at which branch runs; 'a ties res to both inputs.
+        - text: "A struct that holds a reference needs a lifetime parameter too: an Excerpt cannot outlive the text it points into."
+        - text: "Elision covers the common cases without annotations: with one reference input, the output gets its lifetime (fn first_word(s: &str) -> &str); in a method with &self, the output gets self's lifetime. 'static means valid for the whole program, like string literals."
+      takeaway: Lifetimes relate references so none outlives its data; they constrain, they do not extend.
+    items:
+      - id: rust.lifetimes.bug-dangling-scope
+        type: bug
+        prompt: "rustc reports E0597: `x` does not live long enough. Which line does it label 'borrowed value does not live long enough'?"
+        code: |
+          fn main() {
+              let r;
+              {
+                  let x = 5;
+                  r = &x;
+              }
+              println!("{r}");
+          }
+        bug_line: 5
+        explanation: r borrows x on line 5, x is dropped at the end of the block (line 6), and r is used on line 7. Move the println! inside the block or declare x in the outer scope.
+        hint: Where is the reference taken?
+
+      - id: rust.lifetimes.output-one-input
+        type: output
+        prompt: What does this print, if it compiles?
+        code: |
+          fn pick<'a>(x: &'a str, _y: &str) -> &'a str {
+              x
+          }
+
+          fn main() {
+              let a = String::from("keep");
+              let r;
+              {
+                  let b = String::from("temporary");
+                  r = pick(&a, &b);
+              }
+              println!("{r}");
+          }
+        options:
+          - text: keep
+            correct: true
+            explanation: The result is tied only to x's lifetime, so dropping b does not matter.
+          - text: "It does not compile: `b` does not live long enough"
+            misconception: all-inputs-bound
+            explanation: That would happen if _y also had 'a. Here _y has its own, unrelated lifetime.
+          - text: temporary
+            misconception: lifetime-picks-value
+            explanation: pick always returns x; lifetimes never change which value is returned.
+        explanation: Give a parameter the output's lifetime only if the result can really borrow from it.
+        hint: Which inputs share 'a with the return type?
+
+      - id: rust.lifetimes.mcq-meaning
+        type: mcq
+        prompt: "In fn longest<'a>(a: &'a str, b: &'a str) -> &'a str, what does 'a do?"
+        options:
+          - text: It tells the compiler the result may be used only while both a and b are still valid
+            correct: true
+            explanation: The caller's borrow checker then rejects any use of the result after the shorter-lived input is gone.
+          - text: It makes a and b live until the result is no longer used
+            misconception: lifetime-extends
+            explanation: Annotations never change when values are dropped; they only describe what must already be true.
+          - text: It marks the strings as 'static, valid for the whole program
+            misconception: lifetime-means-static
+            explanation: "'a is a generic parameter filled in at each call site; 'static is one specific lifetime."
+          - text: It tells a garbage collector when to free the strings
+            misconception: lifetime-is-gc
+            explanation: Rust has no garbage collector; lifetimes are checked at compile time and vanish from the binary.
+        explanation: Lifetimes are generic parameters over scopes, checked at compile time.
+        hint: Do annotations change the program's behaviour?
+
+      - id: rust.lifetimes.mcq-elision
+        type: mcq
+        prompt: "Why does fn first_word(s: &str) -> &str compile without any lifetime annotation?"
+        options:
+          - text: With exactly one reference input, elision gives the output that input's lifetime
+            correct: true
+            explanation: "It is read as fn first_word<'a>(s: &'a str) -> &'a str."
+          - text: The returned &str is always 'static
+            misconception: elided-means-static
+            explanation: The result borrows from s and lives only as long as s.
+          - text: Lifetimes are optional and the compiler just skips the check
+            misconception: elision-skips-check
+            explanation: Elision only fills in the annotation; the borrow check still runs.
+        explanation: With two reference inputs and no &self, there is nothing to infer from, hence E0106 for longest without 'a.
+        hint: How many inputs could the result borrow from?
+
+      - id: rust.lifetimes.code-longest
+        type: code
+        language: rust
+        prompt: longest returns one of its two arguments, and the compiler cannot tell which borrow the result comes from. Annotate the signature with one lifetime.
+        starter: |
+          fn longest(a: &str, b: &str) -> &str {
+              if b.len() > a.len() { b } else { a }
+          }
+
+          fn main() {
+              let first = String::from("pear");
+              let winner;
+              {
+                  let second = String::from("banana");
+                  winner = longest(&first, &second).to_string();
+              }
+              println!("{winner}");
+          }
+        solution: |
+          fn longest<'a>(a: &'a str, b: &'a str) -> &'a str {
+              if b.len() > a.len() { b } else { a }
+          }
+
+          fn main() {
+              let first = String::from("pear");
+              let winner;
+              {
+                  let second = String::from("banana");
+                  winner = longest(&first, &second).to_string();
+              }
+              println!("{winner}");
+          }
+        expected: |
+          banana
+        explanation: With two reference parameters the elision rules cannot pick a lifetime for the result (E0106). <'a> says the returned reference lives no longer than both inputs. That is why main copies it into a String with to_string() before second goes out of scope.
+        hint: "fn longest<'a>(a: &'a str, ..."
+
+  - id: rust.iterators-closures
+    title: Iterators and closures
+    summary: >
+      Iterator adapters (map, filter, enumerate, take) are lazy and do nothing
+      until a consumer (collect, sum, for) pulls values. iter() yields &T,
+      iter_mut() &mut T, into_iter() T. Closures capture by reference, by
+      mutable reference or by value (move).
+    level: intermediate
+    prereqs: [rust.collections, rust.traits-generics]
+    lesson:
+      intro: Iterator chains read like a pipeline and compile to plain loops. The catch is that nothing runs until something asks for values.
+      example:
+        lang: rust
+        code: |
+          fn main() {
+              let nums = vec![1, 2, 3, 4, 5, 6];
+              let evens_sq: Vec<i32> = nums.iter().filter(|n| *n % 2 == 0).map(|n| n * n).collect();
+              let total: i32 = nums.iter().sum();
+              println!("{evens_sq:?} {total}");
+              let lazy = nums.iter().map(|n| { println!("saw {n}"); n * 10 });
+              println!("built");
+              let firsts: Vec<i32> = lazy.take(2).collect();
+              println!("{firsts:?}");
+              let mut count = 0;
+              let mut bump = || count += 1;
+              bump(); bump();
+              println!("{count}");
+          }
+      steps:
+        - text: "nums.iter() yields &i32 and leaves nums untouched. filter keeps the even ones, map squares them, and collect builds a Vec, whose type comes from the annotation. Prints [4, 16, 36] 21."
+        - text: map only wraps the iterator. The closure runs when a consumer pulls a value.
+          predict:
+            prompt: What is printed first after the [4, 16, 36] 21 line?
+            options:
+              - text: saw 1
+                explanation: Creating the map runs nothing; built is printed before anything is pulled.
+              - text: built
+                correct: true
+        - text: take(2) pulls only two values, so the closure runs twice (saw 1, saw 2) and firsts is [10, 20]. Laziness lets you stop early.
+        - text: "A closure captures what it uses. bump changes count, so it borrows count mutably (it is FnMut) and must be declared let mut bump. Prints 2."
+        - text: "A move closure takes ownership of what it captures; that is needed when the closure outlives the current scope, as with threads. for x in v consumes v (into_iter); for x in &v borrows it."
+      takeaway: Adapters are lazy, consumers drive them; choose iter, iter_mut or into_iter on purpose; closures borrow unless you say move.
+    items:
+      - id: rust.iterators-closures.output-lazy-map
+        type: output
+        prompt: What does this print?
+        code: |
+          fn main() {
+              let v = vec![1, 2, 3];
+              let it = v.iter().map(|x| {
+                  print!("m{x} ");
+                  x * 2
+              });
+              print!("start ");
+              let s: i32 = it.sum();
+              println!("= {s}");
+          }
+        options:
+          - text: start m1 m2 m3 = 12
+            correct: true
+            explanation: map is lazy; its closure runs only when sum pulls each value.
+          - text: m1 m2 m3 start = 12
+            misconception: iterators-eager
+            explanation: Building the chain runs nothing. Rust iterators are lazy, unlike a list built eagerly.
+          - text: start = 12
+            misconception: closure-side-effects-skipped
+            explanation: The closure does run, once per element, while sum consumes the iterator.
+        explanation: An unused iterator chain does nothing at all, and rustc warns that iterators are lazy.
+        hint: When does the closure inside map run?
+
+      - id: rust.iterators-closures.mcq-for-moves
+        type: mcq
+        prompt: names is a Vec<String>. Which loop leaves names usable after the loop?
+        options:
+          - text: "for n in &names { println!(\"{n}\"); }"
+            correct: true
+            explanation: Looping over &names calls iter() and yields &String.
+          - text: "for n in names { println!(\"{n}\"); }"
+            misconception: for-borrows-implicitly
+            explanation: This calls into_iter() on the Vec and moves it; using names afterwards is E0382, borrow of moved value.
+          - text: Either one; for loops never take ownership
+            misconception: for-borrows-implicitly
+            explanation: A for loop takes whatever you give it. Give it the Vec and it consumes the Vec.
+        explanation: "&v → &T, &mut v → &mut T, v → T (consumed)."
+        hint: Which form calls into_iter() on the Vec itself?
+
+      - id: rust.iterators-closures.bug-fnmut-binding
+        type: bug
+        prompt: "rustc reports E0596: cannot borrow `record` as mutable, as it is not declared as mutable. Which line must change?"
+        code: |
+          fn main() {
+              let mut hits = 0;
+              let record = |x: i32| {
+                  if x > 10 { hits += 1; }
+              };
+              record(5);
+              record(20);
+              println!("{hits}");
+          }
+        bug_line: 3
+        explanation: The closure mutates hits, so it is FnMut, and calling it needs a mutable binding. Write let mut record = ....
+        hint: The closure itself changes state when called.
+
+      - id: rust.iterators-closures.output-enumerate-chain
+        type: output
+        prompt: What does this print?
+        code: |
+          fn main() {
+              let v = vec![5, 3, 8, 1];
+              let r: Vec<i32> = v.iter().enumerate().filter(|(i, _)| i % 2 == 0).map(|(_, x)| x * 10).collect();
+              println!("{r:?}");
+          }
+        answers: ["[50, 80]"]
+        explanation: enumerate pairs each value with its index; the filter keeps indices 0 and 2 (values 5 and 8), and map multiplies them by 10.
+        hint: The filter tests the index, not the value.
+
+      - id: rust.iterators-closures.code-lazy-map
+        type: code
+        language: rust
+        prompt: seen stays empty because the iterator never runs. Make the long words, uppercased, end up in seen.
+        starter: |
+          fn main() {
+              let words = ["apple", "kiwi", "banana", "fig"];
+              let mut seen = Vec::new();
+              words.iter().filter(|w| w.len() > 3).map(|w| seen.push(w.to_uppercase()));
+              println!("{seen:?}");
+
+              let total: usize = words.iter().map(|w| w.len()).sum();
+              println!("{total}");
+          }
+        solution: |
+          fn main() {
+              let words = ["apple", "kiwi", "banana", "fig"];
+              let seen: Vec<String> = words
+                  .iter()
+                  .filter(|w| w.len() > 3)
+                  .map(|w| w.to_uppercase())
+                  .collect();
+              println!("{seen:?}");
+
+              let total: usize = words.iter().map(|w| w.len()).sum();
+              println!("{total}");
+          }
+        expected: |
+          ["APPLE", "KIWI", "BANANA"]
+          18
+        explanation: Iterator adapters like filter and map are lazy; nothing happens until a consumer such as collect, sum or for_each pulls items, and the compiler warns that an unused Map must be used. Collecting the mapped values is clearer than pushing from inside a closure (for_each would also work).
+        hint: Which method consumes an iterator into a Vec?
+
+  - id: rust.error-handling
+    title: Error handling
+    summary: >
+      Result is for failures a caller can handle; panic! is for bugs. A
+      custom error enum plus From impls lets ? convert errors automatically;
+      Box<dyn Error> is the quick catch-all, and main may return a Result.
+    level: intermediate
+    prereqs: [rust.option-result, rust.traits-generics]
+    lesson:
+      intro: Real programs combine errors from many sources. A function's error type says what can go wrong, and From tells ? how to convert.
+      example:
+        lang: rust
+        code: |
+          use std::num::ParseIntError;
+          #[derive(Debug)]
+          enum AppError { Parse(ParseIntError), Negative(i64) }
+          impl From<ParseIntError> for AppError {
+              fn from(e: ParseIntError) -> Self { AppError::Parse(e) }
+          }
+          fn check(s: &str) -> Result<i64, AppError> {
+              let n = s.parse::<i64>()?;
+              if n < 0 { return Err(AppError::Negative(n)); }
+              Ok(n)
+          }
+          fn main() {
+              for s in ["7", "-2", "x"] { println!("{:?}", check(s)); }
+              println!("{}", "12".parse::<i64>().expect("valid number"));
+          }
+      steps:
+        - text: AppError lists every way check can fail, one variant each. Callers can match on it and react differently.
+        - text: parse fails with a ParseIntError, but check returns AppError. ? calls From::from on the error, so the From impl does the conversion.
+          predict:
+            prompt: What happens if you delete the impl From block?
+            options:
+              - text: "A compile error: `?` couldn't convert the error to `AppError` (E0277)"
+                correct: true
+              - text: It compiles, and the parse error becomes a panic
+                explanation: "? never panics; without a conversion it simply cannot compile."
+              - text: It compiles, and ? returns the ParseIntError unchanged
+                explanation: The function promises AppError; a ParseIntError does not fit that type.
+        - text: "The loop prints Ok(7), then Err(Negative(-2)), then Err(Parse(ParseIntError { kind: InvalidDigit }))."
+        - text: "expect is unwrap with a message: on Err it panics with \"valid number: ...\". Use it only when failure would be a bug, as here with a constant \"12\"."
+        - text: "For applications, fn main() -> Result<(), Box<dyn std::error::Error>> accepts any error through ?. Returning Err prints Error: followed by its Debug form and exits with code 1. Libraries usually define enums (often with the thiserror crate) and implement Display and std::error::Error."
+      takeaway: Return Result for expected failures, panic for bugs; a From impl lets ? convert errors into yours.
+    items:
+      - id: rust.error-handling.output-main-err
+        type: output
+        prompt: What does running this program show in the terminal?
+        code: |
+          use std::error::Error;
+
+          fn main() -> Result<(), Box<dyn Error>> {
+              let n: u8 = "300".parse()?;
+              println!("{n}");
+              Ok(())
+          }
+        options:
+          - text: "Error: ParseIntError { kind: PosOverflow }"
+            correct: true
+            explanation: "300 does not fit in a u8, so ? returns the error from main. Rust prints it as Error: plus its Debug form (to stderr) and exits with code 1."
+          - text: "44"
+            misconception: parse-wraps
+            explanation: Parsing never wraps around; out-of-range text is an error.
+          - text: "300"
+            misconception: parse-ignores-type
+            explanation: The target type is u8, whose maximum is 255.
+          - text: "thread 'main' panicked at ..."
+            misconception: question-mark-panics
+            explanation: "? returns the error; main returning Err is a normal exit with code 1, not a panic."
+        explanation: Box<dyn Error> accepts any error type that implements std::error::Error.
+        hint: What is the largest u8?
+
+      - id: rust.error-handling.bug-missing-from
+        type: bug
+        prompt: "rustc reports E0277: `?` couldn't convert the error to `ConfigError`. Which line does it point at?"
+        code: |
+          #[derive(Debug)]
+          enum ConfigError { Missing }
+
+          fn port(s: &str) -> Result<u16, ConfigError> {
+              if s.is_empty() { return Err(ConfigError::Missing); }
+              let p = s.parse::<u16>()?;
+              Ok(p)
+          }
+          fn main() { let _ = port("1"); }
+        bug_line: 6
+        explanation: "parse fails with ParseIntError, and there is no From<ParseIntError> for ConfigError. Add a variant plus a From impl, or convert by hand: s.parse::<u16>().map_err(|_| ConfigError::Missing)?."
+        hint: Which line uses ? on a different error type?
+
+      - id: rust.error-handling.multi-main-return
+        type: multi
+        prompt: Which of these are valid return types for main?
+        options:
+          - text: ()
+            correct: true
+          - text: Result<(), std::io::Error>
+            correct: true
+            explanation: Any Result whose error type implements Debug works.
+          - text: Result<(), Box<dyn std::error::Error>>
+            correct: true
+          - text: std::process::ExitCode
+            correct: true
+            explanation: Lets you choose the exit status, e.g. ExitCode::from(2).
+          - text: i32
+            misconception: main-returns-int
+            explanation: "Unlike C, main cannot return an integer: `main` has invalid return type `i32`. Use ExitCode or std::process::exit."
+          - text: Option<()>
+            misconception: main-returns-option
+            explanation: Option does not implement the Termination trait, so rustc rejects it.
+        explanation: main's return type must implement std::process::Termination.
+        hint: Errors need to be printable; integers are not exit codes here.
+
+      - id: rust.error-handling.mcq-panic-vs-result
+        type: mcq
+        prompt: A function reads a user-supplied config file that may be missing. How should it report a missing file?
+        options:
+          - text: Return Result and let the caller decide what to do
+            correct: true
+            explanation: A missing file is an expected, recoverable situation.
+          - text: Call .unwrap() on the open result
+            misconception: unwrap-for-expected-errors
+            explanation: unwrap panics and kills the thread; it is meant for cases where failure is a bug.
+          - text: Return an empty String so the caller never sees an error
+            misconception: sentinel-instead-of-result
+            explanation: That hides the failure; the caller cannot tell "missing" from "empty".
+        explanation: Result for what can happen in normal operation, panic for broken invariants.
+        hint: Is a missing file a bug in your program?
+
+      - id: rust.error-handling.code-from-error
+        type: code
+        language: rust
+        prompt: The ? operator cannot turn a ParseIntError into a ConfigError yet. Implement the conversion so port compiles and reports both kinds of error.
+        starter: |
+          use std::fmt;
+          use std::num::ParseIntError;
+
+          #[derive(Debug)]
+          enum ConfigError {
+              Missing(String),
+              BadNumber(ParseIntError),
+          }
+
+          impl fmt::Display for ConfigError {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  match self {
+                      ConfigError::Missing(key) => write!(f, "missing {key}"),
+                      ConfigError::BadNumber(e) => write!(f, "bad number: {e}"),
+                  }
+              }
+          }
+
+          // add the conversion here
+
+          fn port(line: &str) -> Result<u16, ConfigError> {
+              let value = line
+                  .strip_prefix("port=")
+                  .ok_or(ConfigError::Missing("port".to_string()))?;
+              let n = value.parse::<u16>()?;
+              Ok(n)
+          }
+
+          fn main() {
+              for line in ["port=8080", "host=x", "port=99999"] {
+                  match port(line) {
+                      Ok(p) => println!("port {p}"),
+                      Err(e) => println!("error: {e}"),
+                  }
+              }
+          }
+        solution: |
+          use std::fmt;
+          use std::num::ParseIntError;
+
+          #[derive(Debug)]
+          enum ConfigError {
+              Missing(String),
+              BadNumber(ParseIntError),
+          }
+
+          impl fmt::Display for ConfigError {
+              fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                  match self {
+                      ConfigError::Missing(key) => write!(f, "missing {key}"),
+                      ConfigError::BadNumber(e) => write!(f, "bad number: {e}"),
+                  }
+              }
+          }
+
+          impl From<ParseIntError> for ConfigError {
+              fn from(e: ParseIntError) -> Self {
+                  ConfigError::BadNumber(e)
+              }
+          }
+
+          fn port(line: &str) -> Result<u16, ConfigError> {
+              let value = line
+                  .strip_prefix("port=")
+                  .ok_or(ConfigError::Missing("port".to_string()))?;
+              let n = value.parse::<u16>()?;
+              Ok(n)
+          }
+
+          fn main() {
+              for line in ["port=8080", "host=x", "port=99999"] {
+                  match port(line) {
+                      Ok(p) => println!("port {p}"),
+                      Err(e) => println!("error: {e}"),
+                  }
+              }
+          }
+        expected: |
+          port 8080
+          error: missing port
+          error: bad number: number too large to fit in target type
+        explanation: "? converts the error with From::from before returning it, so a function returning Result<_, ConfigError> can use ? on a ParseIntError only once From<ParseIntError> for ConfigError exists (otherwise E0277). ok_or turns the Option from strip_prefix into a Result, and Display gives the messages printed with {e}."
+        hint: "impl From<ParseIntError> for ConfigError"
+
+  - id: rust.smart-pointers
+    title: Box, Rc and RefCell
+    summary: >
+      Box<T> puts a value on the heap with one owner (needed for recursive
+      types and trait objects). Rc<T> shares ownership with a reference count
+      in one thread. RefCell<T> moves the borrow rules to run time, allowing
+      mutation through a shared reference.
+    level: advanced
+    prereqs: [rust.traits-generics, rust.borrowing]
+    lesson:
+      intro: Ownership is one owner, borrows checked at compile time. Smart pointers relax that in controlled ways when a design really needs it.
+      example:
+        lang: rust
+        code: |
+          use std::cell::RefCell;
+          use std::rc::Rc;
+
+          #[derive(Debug)]
+          enum List { Cons(i32, Box<List>), Nil }
+
+          fn main() {
+              let l = List::Cons(1, Box::new(List::Cons(2, Box::new(List::Nil))));
+              println!("{l:?}");
+              let shared = Rc::new(RefCell::new(vec![1]));
+              let other = Rc::clone(&shared);
+              other.borrow_mut().push(2);
+              println!("{:?} {}", shared.borrow(), Rc::strong_count(&shared));
+          }
+      steps:
+        - text: "A List that contained a List directly would have infinite size: error[E0072]: recursive type `List` has infinite size. Box is a fixed-size pointer to the heap, so Cons(i32, Box<List>) works. Prints Cons(1, Cons(2, Nil))."
+        - text: Rc::new puts the value on the heap with a count of owners. Rc::clone does not copy the Vec; it bumps the count and returns another pointer to the same value.
+          predict:
+            prompt: What does Rc::strong_count(&shared) print?
+            options:
+              - text: "1"
+                explanation: other is a second owner of the same allocation.
+              - text: "2"
+                correct: true
+              - text: "0"
+                explanation: The count only reaches 0 when the last owner is dropped, which frees the value.
+        - text: Rc gives shared access, so it only hands out & references; a.push(2) on an Rc<Vec<i32>> is E0596, cannot borrow data in an `Rc` as mutable. RefCell adds interior mutability.
+        - text: borrow() and borrow_mut() enforce the usual rules at run time. The line prints [1, 2] 2.
+          predict:
+            prompt: What happens if two borrow_mut() guards are alive at once?
+            options:
+              - text: "It panics at run time: RefCell already borrowed"
+                correct: true
+              - text: It does not compile
+                explanation: RefCell exists precisely to move this check from compile time to run time.
+              - text: The second one waits until the first is dropped
+                explanation: That is what a Mutex does across threads; RefCell panics instead.
+        - text: Two Rc pointing at each other never reach count 0 and leak; use Weak for back-pointers such as parent links. Rc and RefCell are single-threaded; Arc and Mutex are the thread-safe versions.
+      takeaway: Box for heap and recursion, Rc for shared ownership, RefCell for run-time-checked mutation; Rc<RefCell<T>> is shared mutable state in one thread.
+    items:
+      - id: rust.smart-pointers.output-strong-count
+        type: output
+        prompt: What does this print?
+        code: |
+          use std::rc::Rc;
+
+          fn main() {
+              let a = Rc::new(String::from("x"));
+              let b = Rc::clone(&a);
+              {
+                  let _c = Rc::clone(&a);
+                  print!("{} ", Rc::strong_count(&a));
+              }
+              println!("{} {}", Rc::strong_count(&b), Rc::ptr_eq(&a, &b));
+          }
+        answers: ["3 2 true"]
+        explanation: a, b and _c own the same String (3). _c is dropped at the end of the block (2). a and b point to the same allocation, so ptr_eq is true.
+        hint: When is _c dropped?
+
+      - id: rust.smart-pointers.mcq-refcell-double-borrow
+        type: mcq
+        prompt: What happens with this code?
+        code: |
+          use std::cell::RefCell;
+
+          fn main() {
+              let c = RefCell::new(5);
+              let r1 = c.borrow_mut();
+              let r2 = c.borrow_mut();
+              println!("{} {}", r1, r2);
+          }
+        options:
+          - text: "It compiles, then panics on line 6: RefCell already borrowed"
+            correct: true
+            explanation: RefCell tracks borrows at run time, and r1 is still alive when the second borrow_mut is requested.
+          - text: It does not compile (E0499)
+            misconception: refcell-checked-at-compile-time
+            explanation: The compiler sees two calls on a shared &RefCell, which is allowed; the conflict is only detected when the program runs.
+          - text: It prints 5 5
+            misconception: refcell-allows-aliasing
+            explanation: RefCell keeps the one-writer rule; it only checks it later.
+        explanation: Keep RefCell guards short-lived, or use try_borrow_mut to get a Result instead of a panic.
+        hint: Where are RefCell's rules enforced?
+
+      - id: rust.smart-pointers.mcq-recursive-box
+        type: mcq
+        prompt: "Why does enum List { Cons(i32, List), Nil } fail to compile while Cons(i32, Box<List>) works?"
+        options:
+          - text: Every type needs a size known at compile time; a List inside a List is infinitely large, a Box is one pointer
+            correct: true
+            explanation: rustc says recursive type `List` has infinite size (E0072) and suggests inserting indirection such as Box.
+          - text: Enums cannot refer to themselves at all
+            misconception: no-recursive-types
+            explanation: They can, through a pointer; Box<List> is still self-reference.
+          - text: Box makes the field optional, like null
+            misconception: box-is-nullable
+            explanation: A Box always points to a value; Option<Box<T>> is how you say maybe.
+        explanation: Box also makes trait objects possible (Box<dyn Trait>), for the same reason.
+        hint: How many bytes would a List take?
+
+      - id: rust.smart-pointers.mcq-pick-pointer
+        type: mcq
+        prompt: Several structs in one thread must own the same counter and all be able to increment it. Which type fits?
+        options:
+          - text: Rc<RefCell<u32>>
+            correct: true
+            explanation: Rc gives shared ownership, RefCell allows mutation through it.
+          - text: Rc<u32>
+            misconception: rc-allows-mutation
+            explanation: Rc only gives shared references; you cannot change the value through it.
+          - text: Box<u32> cloned into each struct
+            misconception: box-clone-shares
+            explanation: Cloning a Box deep-copies the value, so each struct would have its own counter.
+          - text: A &mut u32 stored in each struct
+            misconception: two-mut-refs-ok
+            explanation: Only one &mut to a value can exist at a time.
+        explanation: Across threads the same idea is Arc<Mutex<u32>> (or an AtomicU32).
+        hint: You need shared ownership and mutation.
+
+      - id: rust.smart-pointers.code-rc-refcell
+        type: code
+        language: rust
+        prompt: a and b share one log, but data behind an Rc is read-only. Wrap the Vec in a RefCell and borrow it mutably to push.
+        starter: |
+          use std::cell::RefCell;
+          use std::rc::Rc;
+
+          fn main() {
+              let log = Rc::new(Vec::new());
+              let a = Rc::clone(&log);
+              let b = Rc::clone(&log);
+              a.push("from a");
+              b.push("from b");
+              println!("{:?} owners={}", log, Rc::strong_count(&log));
+          }
+        solution: |
+          use std::cell::RefCell;
+          use std::rc::Rc;
+
+          fn main() {
+              let log = Rc::new(RefCell::new(Vec::new()));
+              let a = Rc::clone(&log);
+              let b = Rc::clone(&log);
+              a.borrow_mut().push("from a");
+              b.borrow_mut().push("from b");
+              println!("{:?} owners={}", log.borrow(), Rc::strong_count(&log));
+          }
+        expected: |
+          ["from a", "from b"] owners=3
+        explanation: Rc gives shared ownership but only shared (&) access, so push is error E0596. RefCell moves the borrow check to run time; borrow_mut() hands out one mutable borrow at a time and panics if another is active. Rc::clone only bumps the count, here to 3.
+        hint: Rc<RefCell<Vec<_>>> and .borrow_mut()
+
+  - id: rust.concurrency
+    title: Threads, Send and Sync
+    summary: >
+      thread::spawn needs a 'static closure, usually with move. Arc shares
+      ownership across threads and Mutex guards mutation; channels pass
+      messages. Send and Sync let the compiler reject data races.
+    level: advanced
+    prereqs: [rust.smart-pointers, rust.iterators-closures]
+    lesson:
+      intro: Rust's ownership rules also apply between threads, so a data race is a compile error instead of a heisenbug.
+      example:
+        lang: rust
+        code: |
+          use std::sync::{mpsc, Arc, Mutex};
+          use std::thread;
+
+          fn main() {
+              let counter = Arc::new(Mutex::new(0));
+              let mut handles = Vec::new();
+              for _ in 0..4 {
+                  let c = Arc::clone(&counter);
+                  handles.push(thread::spawn(move || { *c.lock().unwrap() += 1; }));
+              }
+              for h in handles { h.join().unwrap(); }
+              let (tx, rx) = mpsc::channel();
+              thread::spawn(move || tx.send("done").unwrap());
+              println!("{} {}", *counter.lock().unwrap(), rx.recv().unwrap());
+          }
+      steps:
+        - text: A spawned thread may outlive the function that started it, so its closure must own what it uses. move transfers c into the closure.
+          predict:
+            prompt: What happens without move?
+            options:
+              - text: It works, because c is an Arc
+                explanation: The closure would only borrow c, and the borrow could outlive the loop iteration.
+              - text: "A compile error: closure may outlive the current function, but it borrows `c` (E0373)"
+                correct: true
+              - text: A data race at run time
+                explanation: Safe Rust rejects this at compile time.
+        - text: Arc is an Rc with an atomic count, safe to share between threads. Using Rc here fails with E0277, `Rc<Mutex<i32>>` cannot be sent between threads safely.
+        - text: Mutex hands out access through lock(), which returns a guard; the lock is released when the guard is dropped, here at the end of the statement. join waits for each thread, so the count is 4.
+        - text: "A channel moves values between threads: tx.send in one thread, rx.recv in another (recv blocks until a value arrives). Prints 4 done."
+        - text: "Send means a value may move to another thread; Sync means &T may be shared between threads. Rc is neither and RefCell is not Sync, so Arc<RefCell<T>> is rejected too. The compiler prevents data races, not deadlocks. thread::scope lets threads borrow locals because it joins them before returning."
+      takeaway: move closures into threads, Arc to share, Mutex or channels to communicate; Send and Sync turn data races into compile errors.
+    items:
+      - id: rust.concurrency.bug-missing-move
+        type: bug
+        prompt: "rustc reports E0373: closure may outlive the current function, but it borrows `name`. Which line must change?"
+        code: |
+          use std::thread;
+
+          fn main() {
+              let name = String::from("worker");
+              let h = thread::spawn(|| {
+                  println!("hello from {name}");
+              });
+              h.join().unwrap();
+          }
+        bug_line: 5
+        explanation: The closure borrows name, but thread::spawn requires 'static. Write thread::spawn(move || { ... }) so the thread owns name.
+        hint: The closure must own what it uses.
+
+      - id: rust.concurrency.mcq-rc-thread
+        type: mcq
+        prompt: What happens with this code?
+        code: |
+          use std::rc::Rc;
+          use std::thread;
+
+          fn main() {
+              let data = Rc::new(5);
+              let d = Rc::clone(&data);
+              let h = thread::spawn(move || println!("{d}"));
+              h.join().unwrap();
+          }
+        options:
+          - text: "It does not compile: `Rc<i32>` cannot be sent between threads safely"
+            correct: true
+            explanation: Rc's reference count is not atomic, so Rc is not Send. Use Arc.
+          - text: It prints 5
+            misconception: move-makes-send
+            explanation: move transfers d into the closure, but the type itself must be Send to cross threads.
+          - text: It compiles and may crash at run time
+            misconception: send-checked-at-runtime
+            explanation: Send is a compile-time trait bound on thread::spawn.
+        explanation: Swapping Rc for Arc is the whole fix here.
+        hint: Is Rc's counter safe to update from two threads?
+
+      - id: rust.concurrency.multi-send-sync
+        type: multi
+        prompt: Which statements are true in safe Rust?
+        options:
+          - text: Rc<T> cannot be moved to another thread
+            correct: true
+            explanation: It is not Send.
+          - text: Arc<Mutex<T>> can share mutable state between threads
+            correct: true
+          - text: Data races are rejected at compile time
+            correct: true
+          - text: "thread::scope lets spawned threads borrow local variables"
+            correct: true
+            explanation: The scope joins every thread before it returns, so the borrows cannot outlive the data.
+          - text: Mutex makes deadlocks impossible
+            misconception: mutex-prevents-deadlock
+            explanation: Locking two mutexes in opposite orders can still deadlock; the compiler does not check that.
+          - text: Arc<RefCell<T>> is a thread-safe way to share mutable data
+            misconception: refcell-is-sync
+            explanation: RefCell is not Sync, so rustc reports that it cannot be shared between threads safely. Use Mutex or RwLock.
+        explanation: Send and Sync are marker traits the compiler derives automatically from a type's parts.
+        hint: The compiler checks races, not lock ordering.
+
+      - id: rust.concurrency.cloze-arc-mutex
+        type: cloze
+        prompt: "A counter shared and incremented by several threads: let counter = ___::new(___::new(0));"
+        answers: ["Arc | Mutex"]
+        case_sensitive: true
+        explanation: Arc gives shared ownership across threads; Mutex allows one thread at a time to change the value. Each thread gets Arc::clone(&counter).
+        hint: Shared ownership outside, exclusive access inside.
+
+      - id: rust.concurrency.code-arc-mutex
+        type: code
+        language: rust
+        prompt: Rc cannot cross threads. Make the shared total thread-safe so all four threads add to it.
+        starter: |
+          use std::rc::Rc;
+          use std::sync::Mutex;
+          use std::thread;
+
+          fn main() {
+              let total = Rc::new(Mutex::new(0));
+              let mut handles = Vec::new();
+              for i in 1..=4 {
+                  let total = Rc::clone(&total);
+                  handles.push(thread::spawn(move || {
+                      *total.lock().unwrap() += i * 10;
+                  }));
+              }
+              for h in handles {
+                  h.join().unwrap();
+              }
+              println!("{}", *total.lock().unwrap());
+          }
+        solution: |
+          use std::sync::{Arc, Mutex};
+          use std::thread;
+
+          fn main() {
+              let total = Arc::new(Mutex::new(0));
+              let mut handles = Vec::new();
+              for i in 1..=4 {
+                  let total = Arc::clone(&total);
+                  handles.push(thread::spawn(move || {
+                      *total.lock().unwrap() += i * 10;
+                  }));
+              }
+              for h in handles {
+                  h.join().unwrap();
+              }
+              println!("{}", *total.lock().unwrap());
+          }
+        expected: |
+          100
+        explanation: "thread::spawn requires a Send closure. Rc's reference count is not atomic, so Rc is not Send and the starter fails with E0277. Arc counts atomically and the Mutex gives one thread at a time access to the number; the sum is the same whatever order the threads run in, and join waits for all of them."
+        hint: The atomic version of Rc.

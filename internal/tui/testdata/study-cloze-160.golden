@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                                                      │ ▾ SESSION                          1/1
+ Go               ────────   0% │                                                                                      │ ▸ Slices                            Go
+  ▸ ○ Slices                    │ ┌─ Go › Slices ──────────────────────────────────────────────────────────── ○ new ─┐ │
+                                │ │                                                                                  │ │ ▾ CONCEPT                     beginner
+                                │ │ Add 4 to the slice.                                                              │ │ A view over an array with length and
+                                │ │                                                                                  │ │ capacity.
+                                │ │  1  s = [append](s, [▏])                                                         │ │
+                                │ │                                                                                  │ │ ▾ IF YOU ANSWER               next due
+                                │ │ Blank 2 of 2                                                                     │ │ ✗ Again wrong               Wed 11 Nov
+                                │ │                                                                                  │ │ ◆ Hard  hint/slow           Thu 12 Nov
+                                │ └──────────────────────────────────────────────────────────────────────────────────┘ │ ✓ Good  correct             Fri 13 Nov
+                                │                                                                                      │ ▲ Easy  fast                Thu 26 Nov
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+ ────────────────────────────── │                                                                                      │
+ ● █ mastered  ◑ ▓ review       │                                                                                      │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                                                      │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                                                             session [●] 1/1 ✓0 ✗0 │ streak 0d │ Tue 10 Nov
+ go.slices.cloze-append · cloze                                                                     tab next blank · enter next/submit · ctrl+t hint · esc home

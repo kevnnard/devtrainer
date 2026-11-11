@@ -1,0 +1,24 @@
+
+  ┌─ Logic › Loops ────────────────────────────────────── lesson · step 1/3 ─┐
+  │                                                                          │
+  │ A for loop repeats its body while its condition holds.                   │
+  │                                                                          │
+  │  1  for i := 0; i < 3; i++ {                                         go  │
+  │  2      fmt.Println(i)                                                   │
+  │  3  }                                                                    │
+  │                                                                          │
+  │ ▸ 1  i := 0 runs once, before the first check of i < 3.                  │
+  │                                                                          │
+  │   enter  next step     s  skip lesson                                    │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+ devtrainer │ 1 Home   2 Study   3 Tracks  4 Stats        lesson [●··] step 1/3
+                                   enter next · s skip lesson · ? help · q quit

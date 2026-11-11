@@ -1,0 +1,24 @@
+
+  Go › Slices                                                            ○ new
+  ┌─ ✗ Not quite ──────────────────────────── graded again · due Wed 11 Nov ─┐
+  │                                                                          │
+  │ - 5 5  your answer                            make-len-is-cap · 1st time │
+  │ + 2 5  expected                                                          │
+  │                                                                          │
+  │ Why not                                                                  │
+  │   The second argument is the length; the third is the capacity.          │
+  │                                                                          │
+  │ Why this                                                                 │
+  │   make([]T, len, cap).                                                   │
+  │                                                                          │
+  │ Takeaway                                                                 │
+  │   A view over an array with length and capacity.                         │
+  │                                                                          │
+  │   enter  finish session     e  ask the tutor                             │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+
+ devtrainer │ 1 Home   2 Study   3 Tracks  4 Stats                [✗] 1/1 ✓0 ✗1
+                   enter next · e ask the tutor · 1-4 screens · ? help · q quit

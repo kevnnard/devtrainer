@@ -1,0 +1,24 @@
+
+  ┌─ Logic › Recursion ────────────────────────────────────────────── ○ new ─┐
+  │                                                                          │
+  │ Order the lines of a recursive factorial.                                │
+  │                                                                          │
+  │ Selected line 4 of 6 · 3 lines moved so far                              │
+  │  1      return n * fact(n-1)                                    was 2    │
+  │  2      }                                                       was 3    │
+  │  3          return 1                                            was 1    │
+  │   ▸ 4  func fact(n int) int {                                            │
+  │  5  }                                                                    │
+  │  6      if n <= 1 {                                                      │
+  │                                                                          │
+  │ J/K moves the lifted line · enter checks the order                       │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+   next due if                         ✗ Wed 11  ◆ Thu 12  ✓ Fri 13  ▲ Thu 26
+
+
+
+
+ devtrainer │ 1 Home   2 Study   3 Tracks  4 Stats                [●] 1/1 ✓0 ✗0
+                    j/k select · J/K move line · enter submit · h hint · ? help

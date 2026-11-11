@@ -1,0 +1,24 @@
+
+  Logic › Recursion                                                      ○ new
+  ┌─ ✗ Not quite ──────────────────────────── graded again · due Wed 11 Nov ─┐
+  │                                                                          │
+  │ - 6 of 6 lines out of place  your answer                                 │
+  │ + 1  func fact(n int) int {  expected                                    │
+  │ + 2      if n <= 1 {                                                     │
+  │ + 3          return 1                                                    │
+  │ + 4      }                                                               │
+  │ + 5      return n * fact(n-1)                                            │
+  │ + 6  }                                                                   │
+  │ Why this                                                                 │
+  │   The base case comes before the recursive call.                         │
+  │ Takeaway                                                                 │
+  │   A function that calls itself on a smaller input.                       │
+  │                                                                          │
+  │   enter  finish session     e  ask the tutor                             │
+  │                                                                          │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+
+
+ devtrainer │ 1 Home   2 Study   3 Tracks  4 Stats                [✗] 1/1 ✓0 ✗1
+                   enter next · e ask the tutor · 1-4 screens · ? help · q quit

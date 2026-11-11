@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                                                      │ ▾ SESSION                  1/1 · ✓0 ✗1
+ Git              ────────   0% │ Git › Commits                                                                  ○ new │ ✗ Commits                          Git
+  ▸ ○ Commits                   │ What does git commit record?                                                         │
+                                │                                                                                      │ ▾ LAST 5 ANSWERS
+                                │ ┌─ ✗ Not quite ──────────────────────────────────── graded again · due Wed 11 Nov ─┐ │ ✗   0 of 1
+                                │ │                                                                                  │ │ Mastery needs 4 of the last 5 correct,
+                                │ │ - Every change in the working tree  your answer                                  │ │ over at least 2 days.
+                                │ │   commit-takes-worktree · 1st time                                               │ │
+                                │ │ + The staged changes  expected                                                   │ │ ▾ SCHEDULE              before → after
+                                │ │                                                                                  │ │ next due                  new → Wed 11
+                                │ │ Why not                                                                          │ │ lapses                           0 → 0
+                                │ │   Only staged changes are committed; unstaged edits stay in the working tree.    │ │ commit-takes-worktree    1× in 30 days
+                                │ │                                                                                  │ │
+                                │ │ Why this                                                                         │ │ ▾ TUTOR                         via pi
+                                │ │   A commit is a snapshot of the index.                                           │ │ e  explain deeper
+                                │ │                                                                                  │ │ Sends the question, your answer and
+                                │ │ Takeaway                                                                         │ │ the expected one. Everything else
+                                │ │   A commit records the staged snapshot.                                          │ │ works without it.
+                                │ │                                                                                  │ │
+                                │ │   enter  finish session     e  ask the tutor                                     │ │
+                                │ │                                                                                  │ │
+                                │ └──────────────────────────────────────────────────────────────────────────────────┘ │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+ ────────────────────────────── │                                                                                      │
+ ● █ mastered  ◑ ▓ review       │                                                                                      │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                                                      │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                                                             session [✗] 1/1 ✓0 ✗1 │ streak 1d │ Tue 10 Nov
+ git.commit.mcq-what · mcq · answered in 0:00                                                      enter next · e ask the tutor · 1-4 screens · ? help · q quit

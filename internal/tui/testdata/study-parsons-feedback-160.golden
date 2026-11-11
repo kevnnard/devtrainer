@@ -1,0 +1,36 @@
+ ▾ TRACKS          0/1 mastered │                                                                                      │ ▾ SESSION                  1/1 · ✓0 ✗1
+ Logic            ────────   0% │ Logic › Recursion                                                              ○ new │ ✗ Recursion                      Logic
+  ▸ ○ Recursion                 │ Order the lines of a recursive factorial.                                            │
+                                │                                                                                      │ ▾ LAST 5 ANSWERS
+                                │ ┌─ ✗ Not quite ──────────────────────────────────── graded again · due Wed 11 Nov ─┐ │ ✗   0 of 1
+                                │ │                                                                                  │ │ Mastery needs 4 of the last 5 correct,
+                                │ │ -     return n * fact(n-1)  your answer                                          │ │ over at least 2 days.
+                                │ │ + func fact(n int) int {  expected                                               │ │
+                                │ │ -         return 1                                                               │ │ ▾ SCHEDULE              before → after
+                                │ │ +     if n <= 1 {                                                                │ │ next due                  new → Wed 11
+                                │ │ -     }                                                                          │ │ lapses                           0 → 0
+                                │ │ +         return 1                                                               │ │
+                                │ │ - func fact(n int) int {                                                         │ │ ▾ TUTOR                         via pi
+                                │ │ +     }                                                                          │ │ e  explain deeper
+                                │ │ - }                                                                              │ │ Sends the question, your answer and
+                                │ │ +     return n * fact(n-1)                                                       │ │ the expected one. Everything else
+                                │ │ -     if n <= 1 {                                                                │ │ works without it.
+                                │ │ + }                                                                              │ │
+                                │ │                                                                                  │ │
+                                │ │ Why this                                                                         │ │
+                                │ │   The base case comes before the recursive call.                                 │ │
+                                │ │                                                                                  │ │
+                                │ │ Takeaway                                                                         │ │
+                                │ │   A function that calls itself on a smaller input.                               │ │
+                                │ │                                                                                  │ │
+                                │ │   enter  finish session     e  ask the tutor                                     │ │
+                                │ │                                                                                  │ │
+                                │ └──────────────────────────────────────────────────────────────────────────────────┘ │
+                                │                                                                                      │
+                                │                                                                                      │
+                                │                                                                                      │
+ ────────────────────────────── │                                                                                      │
+ ● █ mastered  ◑ ▓ review       │                                                                                      │
+ ◔ ░ learning  ○ new  ⊘ locked  │                                                                                      │
+ devtrainer │  1 Home   2 Study   3 Tracks   4 Stats                                                             session [✗] 1/1 ✓0 ✗1 │ streak 1d │ Tue 10 Nov
+ logic.recursion.parsons-fact · parsons · answered in 0:00                                         enter next · e ask the tutor · 1-4 screens · ? help · q quit

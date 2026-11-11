@@ -1,0 +1,672 @@
+track:
+  id: python
+  title: Python
+  description: Python 3.12+ — semantics that interviews probe, collections, functions, classes, typing, generators and asyncio.
+  order: 50
+
+concepts:
+  - id: python.basics
+    title: Numbers, identity and formatting
+    summary: >
+      / is true division, // floors toward negative infinity. == compares
+      values, `is` compares identity. f-strings format with a mini-language.
+    level: beginner
+    prereqs: [logic.big-o]
+    lesson:
+      intro: Python has two divisions and two kinds of equality. Both trip people up.
+      example:
+        lang: python
+        code: |
+          print(9 / 4, 9 // 4, -9 // 4)
+          a = [1, 2]
+          b = list(a)
+          print(a == b, a is b)
+          print(f"{10 / 3:.2f}")
+      steps:
+        - text: "/ is true division and always returns a float: 9 / 4 is 2.25."
+        - text: "// floors toward negative infinity: 9 // 4 is 2, and -9 // 4 is -3 because -2.25 floors down to -3."
+          predict:
+            prompt: What is -9 // 4?
+            options:
+              - text: "-2"
+                explanation: // floors toward negative infinity; it does not cut toward 0.
+              - text: "-2.25"
+                explanation: // gives a whole number; / is the one that keeps decimals.
+              - text: "-3"
+                correct: true
+        - text: == compares values, so the two lists are equal. is compares identity, and list(a) built a new object, so a is b is False.
+          predict:
+            prompt: b = list(a) copies a. What do a == b and a is b give?
+            options:
+              - text: True False
+                correct: true
+              - text: True True
+                explanation: is checks identity; b is a different list object.
+              - text: False False
+                explanation: == compares contents, and both lists hold 1, 2.
+        - text: "In an f-string, the part after : is a format spec. .2f prints a float with two decimals, here 3.33."
+      takeaway: / gives a float and // floors toward -∞; == compares values, is compares identity.
+    items:
+      - id: python.basics.output-division
+        type: output
+        prompt: What does this print?
+        code: |
+          print(7 // 2, 7 / 2, -7 // 2)
+        answers: ["3 3.5 -4"]
+        explanation: "// floors: 7 // 2 = 3 and -7 // 2 = floor(-3.5) = -4. / always returns a float."
+        hint: Floor rounds toward negative infinity, not toward zero.
+
+      - id: python.basics.output-is-vs-eq
+        type: output
+        prompt: What does this print?
+        code: |
+          a = [1, 2]
+          b = [1, 2]
+          c = a
+          print(a == b, a is b, a is c)
+        options:
+          - text: "True False True"
+            correct: true
+            explanation: a and b are equal lists but distinct objects; c is another name for the same object as a.
+          - text: "True True True"
+            misconception: is-means-equal
+            explanation: "`is` checks identity (same object), not equal contents."
+          - text: "False False True"
+            misconception: eq-compares-identity
+            explanation: "== on lists compares elements, so two lists with the same items are equal."
+        explanation: Use `is` only for singletons such as None; use == for values.
+        hint: How many list objects are created?
+
+      - id: python.basics.cloze-fstring
+        type: cloze
+        prompt: "Print price = 3.14159 with exactly two decimals: print(f\"{price:___}\")"
+        answers: [".2f"]
+        case_sensitive: true
+        explanation: The format spec .2f means fixed-point with 2 digits after the decimal point, giving 3.14.
+        hint: Precision, then the type letter for fixed-point.
+
+      - id: python.basics.code-split-bill
+        type: code
+        language: python
+        prompt: Three friends split a bill of 100. Print each share with exactly two decimals (33.33).
+        starter: |
+          total = 100
+          people = 3
+          share = total // people
+          print(f"{share}")
+        solution: |
+          total = 100
+          people = 3
+          share = total / people
+          print(f"{share:.2f}")
+        expected: |
+          33.33
+        explanation: "// floors to the whole number 33 and throws the cents away. / is true division (33.333…), and the format spec :.2f rounds it to two decimals for display."
+        hint: One division keeps the decimals; the f-string decides how many to show.
+
+  - id: python.collections
+    title: Lists, dicts and sets
+    summary: >
+      Lists are ordered and mutable, dicts preserve insertion order, sets and
+      dict keys require hashable (immutable) values. Slicing copies; * on a
+      list of lists repeats references.
+    level: beginner
+    prereqs: [python.basics, logic.hashing]
+    lesson:
+      intro: Lists, dicts and sets look simple, but slicing, repetition with * and hashing each hide one rule worth knowing.
+      example:
+        lang: python
+        code: |
+          xs = [10, 20, 30, 40, 50]
+          print(xs[1:4], xs[::2], xs[-2:])
+          rows = [[0] * 2 for _ in range(2)]
+          alias = [[0] * 2] * 2
+          rows[0][0] = 1
+          alias[0][0] = 1
+          print(rows, alias)
+          groups = {}
+          for w in ["ant", "bee", "ape"]:
+              groups.setdefault(w[0], []).append(w)
+          print(groups)
+      steps:
+        - text: "A slice is [start:stop:step]. stop is excluded, a negative index counts from the end, and a negative step walks backwards ([::-1] reverses). Slicing builds a new list."
+          predict:
+            prompt: What is xs[1:4]?
+            options:
+              - text: "[10, 20, 30, 40]"
+                explanation: Indices start at 0, so index 1 is 20.
+              - text: "[20, 30, 40, 50]"
+                explanation: The stop index 4 is excluded, so 50 is not included.
+              - text: "[20, 30, 40]"
+                correct: true
+        - text: xs[::2] takes every second element, [10, 30, 50], and xs[-2:] the last two, [40, 50].
+        - text: "* repeats references, not objects: alias holds the same inner list twice, so one assignment shows up in both rows. The comprehension builds a fresh inner list per row."
+          predict:
+            prompt: What does alias print?
+            options:
+              - text: "[[1, 0], [1, 0]]"
+                correct: true
+              - text: "[[1, 0], [0, 0]]"
+                explanation: That is rows; alias has only one inner list, referenced twice.
+        - text: "setdefault(key, default) returns the existing value, or inserts the default and returns it, so grouping is one line. Dicts keep insertion order, so this prints {'a': ['ant', 'ape'], 'b': ['bee']}. collections.defaultdict(list) does the same."
+        - text: "Dict keys and set members must be hashable, which in practice means immutable: int, str, tuples of hashables, frozenset. Lists, dicts and sets are not, because their contents (and so their hash) could change."
+      takeaway: Slices exclude stop and copy; * repeats references; dict keys and set members must be immutable.
+    items:
+      - id: python.collections.output-slicing
+        type: output
+        prompt: What does this print?
+        code: |
+          nums = [0, 1, 2, 3, 4, 5]
+          print(nums[1:5:2], nums[::-1][:2])
+        answers: ["[1, 3] [5, 4]"]
+        explanation: "[1:5:2] takes indices 1 and 3 (stop excluded); [::-1] reverses, then [:2] takes the first two of the reversed list."
+        hint: The stop index is excluded.
+
+      - id: python.collections.output-list-multiply
+        type: output
+        prompt: What does this print?
+        code: |
+          grid = [[0] * 3] * 3
+          grid[0][0] = 1
+          print(grid)
+        options:
+          - text: "[[1, 0, 0], [1, 0, 0], [1, 0, 0]]"
+            correct: true
+            explanation: The outer * 3 repeats a reference to the same inner list three times.
+          - text: "[[1, 0, 0], [0, 0, 0], [0, 0, 0]]"
+            misconception: list-multiply-copies
+            explanation: "* does not copy the inner list. Build rows independently: [[0] * 3 for _ in range(3)]."
+          - text: "TypeError"
+            misconception: list-multiply-invalid
+            explanation: Multiplying a list by an int is valid and repeats its elements.
+        explanation: Repetition copies references, not objects — harmless for ints, surprising for lists.
+        hint: How many distinct inner lists exist?
+
+      - id: python.collections.output-setdefault
+        type: output
+        prompt: What does this print?
+        code: |
+          words = ["apple", "bob", "avocado", "cat"]
+          by_first = {}
+          for w in words:
+              by_first.setdefault(w[0], []).append(w)
+          print(by_first)
+        options:
+          - text: "{'a': ['apple', 'avocado'], 'b': ['bob'], 'c': ['cat']}"
+            correct: true
+            explanation: setdefault returns the existing list or inserts and returns a new one; keys keep insertion order.
+          - text: "{'a': ['avocado'], 'b': ['bob'], 'c': ['cat']}"
+            misconception: setdefault-overwrites
+            explanation: setdefault only inserts when the key is missing; it never replaces an existing value.
+          - text: "{'a': None, 'b': None, 'c': None}"
+            misconception: append-returns-list
+            explanation: The dict stores the list returned by setdefault; append's None return value is discarded.
+        explanation: collections.defaultdict(list) is the other idiomatic way to group.
+        hint: What does setdefault return when the key already exists?
+
+      - id: python.collections.multi-hashable
+        type: multi
+        prompt: Which values can be used as dict keys or set members?
+        options:
+          - text: "(1, 2)"
+            correct: true
+            explanation: A tuple of hashable items is hashable.
+          - text: "frozenset({1, 2})"
+            correct: true
+            explanation: frozenset is the immutable, hashable set.
+          - text: "\"user:42\""
+            correct: true
+            explanation: Strings are immutable and hashable.
+          - text: "[1, 2]"
+            misconception: mutable-hashable
+            explanation: Lists are mutable, so their hash could change; they are unhashable.
+          - text: "{\"a\": 1}"
+            misconception: mutable-hashable
+            explanation: Dicts are mutable and unhashable.
+        explanation: Hashable means the hash never changes during the object's life — in practice, immutable.
+        hint: Can the value change after you create it?
+
+      - id: python.collections.code-grid-rows
+        type: code
+        language: python
+        prompt: Build a 2 x 3 grid of zeros, set row 0, column 1 to 5 and print the grid. Only the first row may change.
+        starter: |
+          grid = [[0] * 3] * 2
+          grid[0][1] = 5
+          print(grid)
+        solution: |
+          grid = [[0] * 3 for _ in range(2)]
+          grid[0][1] = 5
+          print(grid)
+        expected: |
+          [[0, 5, 0], [0, 0, 0]]
+        explanation: "[[0] * 3] * 2 repeats a reference to the same inner list, so both rows are one object and the write shows twice. A comprehension evaluates [0] * 3 once per row, giving independent lists."
+        hint: How many inner list objects does `* 2` create?
+
+  - id: python.functions
+    title: Functions and closures
+    summary: >
+      Default arguments are evaluated once at definition time; closures capture
+      variables, not values; parameters can be positional-only (/) or
+      keyword-only (*).
+    level: intermediate
+    prereqs: [python.collections]
+    lesson:
+      intro: "Two Python rules decide what a function sees: default values are evaluated once, when def runs, and closures look variables up when they are called."
+      example:
+        lang: python
+        code: |
+          def log(msg, history=[]):
+              history.append(msg)
+              return history
+
+          log("a")
+          print(log("b"))
+
+          def greet(name, /, *, punct="!"):
+              return name + punct
+
+          print(greet("Ana", punct="?"))
+          fs = [lambda: n for n in range(3)]
+          print(fs[0]())
+      steps:
+        - text: "def runs once and evaluates history=[] at that moment. Every call without a history argument shares that same list, so the second call still sees \"a\"."
+          predict:
+            prompt: What does print(log("b")) show?
+            options:
+              - text: "['b']"
+                explanation: The default list was created once and already holds "a" from the first call.
+              - text: "['a', 'b']"
+                correct: true
+        - text: "The fix: history=None, then inside the function, if history is None: history = []. Each call gets a new list."
+        - text: Parameters before / are positional-only and parameters after a bare * are keyword-only. greet("Ana", punct="?") prints Ana?, but greet(name="Ana") and greet("Ana", "?") both raise TypeError.
+        - text: "Closures capture variables, not values. All three lambdas share n and read it when called, after the loop has left it at 2. Bind the current value with a default: lambda n=n: n."
+          predict:
+            prompt: What does fs[0]() return?
+            options:
+              - text: "2"
+                correct: true
+              - text: "0"
+                explanation: The lambda reads n when it is called, and by then n is 2.
+              - text: NameError
+                explanation: The comprehension's variable stays alive for the closures that use it.
+        - text: "@functools.cache memoizes a function by its arguments (unbounded, like lru_cache(maxsize=None)): repeated calls become dict lookups, which turns naive recursive Fibonacci into O(n). Arguments must be hashable."
+      takeaway: "Defaults are built once at def time (use None), closures bind late, / and * fix how arguments are passed."
+    items:
+      - id: python.functions.bug-mutable-default
+        type: bug
+        prompt: add_item("a") then add_item("b") returns ['a', 'b']. Which line is the cause?
+        code: |
+          def add_item(item, bucket=[]):
+              bucket.append(item)
+              return bucket
+        bug_line: 1
+        explanation: The default list is created once when def runs and shared by every call. Use bucket=None and create a new list inside.
+        hint: When is the default value evaluated?
+
+      - id: python.functions.output-late-binding
+        type: output
+        prompt: What does this print?
+        code: |
+          fs = [lambda: i for i in range(3)]
+          print([f() for f in fs])
+        options:
+          - text: "[2, 2, 2]"
+            correct: true
+            explanation: All lambdas close over the same variable i, which is 2 when they are called.
+          - text: "[0, 1, 2]"
+            misconception: closure-captures-value
+            explanation: "Closures look up the variable when called, not when created. Bind it with lambda i=i: i."
+          - text: "NameError"
+            misconception: comprehension-var-gone
+            explanation: The comprehension's scope stays alive for the closures that reference it.
+        explanation: Python closures are late-binding.
+        hint: When is i looked up?
+
+      - id: python.functions.cloze-keyword-only
+        type: cloze
+        prompt: "In def f(a, /, b, *, c): a is positional-only, b may be either, and c is ___-only."
+        answers: ["keyword"]
+        explanation: Parameters after a bare * must be passed by name, e.g. f(1, 2, c=3).
+        hint: How must c be passed?
+
+      - id: python.functions.mcq-cache
+        type: mcq
+        prompt: What does decorating a pure recursive fib(n) with @functools.cache do?
+        options:
+          - text: Memoizes results by argument, so each fib(k) is computed once and the total becomes O(n)
+            correct: true
+            explanation: The cache maps arguments to results; repeated subproblems become dict lookups.
+          - text: Compiles the function to machine code
+            misconception: cache-compiles
+            explanation: It is plain memoization in a dict.
+          - text: Caches only the last call
+            misconception: cache-last-only
+            explanation: cache is unbounded (lru_cache(maxsize=None)); lru_cache(maxsize=1) would keep one.
+        explanation: Arguments must be hashable for the cache to work.
+        hint: Think back to the naive Fibonacci call tree.
+
+      - id: python.functions.code-default-list
+        type: code
+        language: python
+        prompt: add_tag should return a new list for each call that does not pass tags. Make it print ['a'] then ['b'].
+        starter: |
+          def add_tag(tag, tags=[]):
+              tags.append(tag)
+              return tags
+
+          print(add_tag("a"))
+          print(add_tag("b"))
+        solution: |
+          def add_tag(tag, tags=None):
+              if tags is None:
+                  tags = []
+              tags.append(tag)
+              return tags
+
+          print(add_tag("a"))
+          print(add_tag("b"))
+        expected: |
+          ['a']
+          ['b']
+        explanation: The default [] is evaluated once, when def runs, so every call without tags appends to the same list and the second call prints ['a', 'b']. Using None as the sentinel creates a fresh list per call.
+        hint: When is a default argument's value created?
+
+  - id: python.oop-typing
+    title: Classes, MRO and typing
+    summary: >
+      super() follows the method resolution order (C3), not just the parent.
+      Dataclasses generate boilerplate. Python 3.12 adds native type-parameter
+      syntax for generics.
+    level: intermediate
+    prereqs: [python.functions]
+    lesson:
+      intro: "super() does not mean \"my parent\". It means \"the next class in the method resolution order (MRO) of the object's class\"."
+      example:
+        lang: python
+        code: |
+          from dataclasses import dataclass
+
+          class A:
+              def who(self): return "A"
+          class L(A):
+              def who(self): return "L" + super().who()
+          class R(A):
+              def who(self): return "R" + super().who()
+          class M(L, R): pass
+          print(M().who())
+
+          @dataclass(frozen=True)
+          class Money:
+              amount: int
+              currency: str = "EUR"
+      steps:
+        - text: "Python linearizes the hierarchy with C3: subclasses before their bases, bases in the order listed, each class once. M.__mro__ is M, L, R, A, object."
+        - text: M has no who, so L.who runs. Its super() continues after L in M's MRO, which is R, not A. R's super() then reaches A, so the result is "LRA".
+          predict:
+            prompt: What does M().who() return?
+            options:
+              - text: "\"LA\""
+                explanation: super() in L follows M's MRO, where R comes before A.
+              - text: "\"LRAA\""
+                explanation: Each class appears once in the MRO, so A.who runs once.
+              - text: "\"LRA\""
+                correct: true
+        - text: "@dataclass writes __init__, __repr__ and __eq__ from the annotated fields. Fields without a default must come first: a field with no default after one with a default raises TypeError when the class is defined."
+          predict:
+            prompt: Could currency (with its default) be declared before amount?
+            options:
+              - text: No, defining the class raises TypeError
+                correct: true
+              - text: Yes, field order never matters
+                explanation: The generated __init__ cannot put a required parameter after an optional one.
+        - text: frozen=True makes assignment to a field raise FrozenInstanceError at runtime and makes instances hashable. dataclasses.replace(m, amount=7) returns a changed copy.
+        - text: "Python 3.12 (PEP 695) declares type parameters in brackets after the name, with no TypeVar boilerplate: def pair[K, V](k: K, v: V) -> tuple[K, V], or class Box[T]: …"
+      takeaway: super() follows the MRO; dataclasses generate the boilerplate (defaults last, frozen for immutability); 3.12 writes generics as name[T].
+    items:
+      - id: python.oop-typing.output-mro
+        type: output
+        prompt: What does this print?
+        code: |
+          class A:
+              def hi(self): return "A"
+          class B(A):
+              def hi(self): return "B" + super().hi()
+          class C(A):
+              def hi(self): return "C" + super().hi()
+          class D(B, C):
+              def hi(self): return "D" + super().hi()
+          print(D().hi())
+        answers: ["DBCA"]
+        explanation: D's MRO is D, B, C, A, object. super() in B continues with the next class in D's MRO, which is C, not A.
+        hint: Check D.__mro__.
+
+      - id: python.oop-typing.cloze-generic-syntax
+        type: cloze
+        prompt: "Python 3.12 type-parameter syntax for a generic function: def first___(xs: list[T]) -> T:"
+        answers: ["[T]"]
+        case_sensitive: true
+        explanation: 'PEP 695 lets you write def first[T](xs: list[T]) -> T without declaring T = TypeVar("T").'
+        hint: Type parameters go in square brackets after the name.
+
+      - id: python.oop-typing.parsons-dataclass
+        type: parsons
+        prompt: Order the lines of an immutable dataclass with a default field.
+        lines:
+          - "from dataclasses import dataclass"
+          - "@dataclass(frozen=True)"
+          - "class Point:"
+          - "    x: float"
+          - "    y: float = 0.0"
+        explanation: Import, decorate, define. Fields without defaults must come before fields with defaults.
+        hint: Can a field without a default follow one with a default?
+
+      - id: python.oop-typing.mcq-frozen
+        type: mcq
+        prompt: "p = Point(1.0) with @dataclass(frozen=True). What happens on p.x = 2.0?"
+        options:
+          - text: It raises dataclasses.FrozenInstanceError
+            correct: true
+            explanation: frozen=True generates a __setattr__ that refuses assignment, which also makes instances hashable.
+          - text: It silently creates a copy with x = 2.0
+            misconception: frozen-copies
+            explanation: Use dataclasses.replace(p, x=2.0) to get a modified copy.
+          - text: It works; frozen only affects type checkers
+            misconception: frozen-is-static-only
+            explanation: frozen is enforced at runtime.
+        explanation: Frozen dataclasses are good value objects and dict keys.
+        hint: Frozen means immutable at runtime.
+
+      - id: python.oop-typing.code-cooperative-super
+        type: code
+        language: python
+        prompt: D inherits from B and C. Make D().hello() visit every class in the MRO once, printing D B C A, then print the MRO names.
+        starter: |
+          class A:
+              def hello(self):
+                  print("A")
+
+          class B(A):
+              def hello(self):
+                  print("B")
+                  A.hello(self)
+
+          class C(A):
+              def hello(self):
+                  print("C")
+                  super().hello()
+
+          class D(B, C):
+              def hello(self):
+                  print("D")
+                  super().hello()
+
+          D().hello()
+          print([k.__name__ for k in D.__mro__])
+        solution: |
+          class A:
+              def hello(self):
+                  print("A")
+
+          class B(A):
+              def hello(self):
+                  print("B")
+                  super().hello()
+
+          class C(A):
+              def hello(self):
+                  print("C")
+                  super().hello()
+
+          class D(B, C):
+              def hello(self):
+                  print("D")
+                  super().hello()
+
+          D().hello()
+          print([k.__name__ for k in D.__mro__])
+        expected: |
+          D
+          B
+          C
+          A
+          ['D', 'B', 'C', 'A', 'object']
+        explanation: "D's MRO is D, B, C, A, object. super() in B means 'the next class after B in the MRO of this object', which is C, not A. Calling A.hello(self) directly skips C."
+        hint: Inside B, which class comes next in D's MRO?
+
+  - id: python.iterators-async
+    title: Generators and asyncio
+    summary: >
+      Generators are lazy: their body runs only when next() asks for a value.
+      asyncio runs coroutines concurrently on one thread — blocking calls
+      freeze the whole event loop.
+    level: advanced
+    prereqs: [python.oop-typing]
+    lesson:
+      intro: Generators and coroutines both pause. A generator pauses at yield until you ask for the next value; a coroutine pauses at await while other coroutines run.
+      example:
+        lang: python
+        code: |
+          import asyncio, time
+
+          def gen():
+              print("run")
+              yield 1
+          g = gen()
+          print("made")
+          print(next(g))
+          async def nap(s):
+              await asyncio.sleep(s)
+          async def main():
+              await asyncio.gather(nap(1), nap(2))
+          t = time.perf_counter(); asyncio.run(main())
+          print(round(time.perf_counter() - t))
+      steps:
+        - text: Calling a generator function runs none of its body; it only returns a generator object. So made prints before run.
+          predict:
+            prompt: What prints first?
+            options:
+              - text: run
+                explanation: gen() only creates the generator; its body has not started.
+              - text: made
+                correct: true
+        - text: next(g) runs the body up to the next yield and pauses there, printing run and then 1. Code after a yield runs only on the following next(). Generators are lazy and single-pass.
+        - text: async def creates coroutines. await asyncio.sleep(s) hands control back to the event loop, which runs the other coroutines meanwhile. gather runs them concurrently and waits for all of them.
+          predict:
+            prompt: How many seconds does the last line print?
+            options:
+              - text: "1"
+                explanation: gather waits for every coroutine, including the 2-second one.
+              - text: "3"
+                explanation: The sleeps overlap; 3 would be awaiting them one after another.
+              - text: "2"
+                correct: true
+        - text: Everything runs on one thread. A blocking call such as time.sleep or a synchronous HTTP client never yields, so it freezes the loop and every coroutine waits. Use await asyncio.sleep, async libraries, or asyncio.to_thread for blocking work.
+      takeaway: Generators run only when next() asks; asyncio overlaps waits at await points, and blocking calls stall the whole loop.
+    items:
+      - id: python.iterators-async.output-lazy-generator
+        type: output
+        prompt: What does this print?
+        code: |
+          def gen():
+              print("start")
+              yield 1
+              print("middle")
+              yield 2
+          g = gen()
+          print("created")
+          print(next(g))
+        answers: ["created\nstart\n1"]
+        explanation: Calling gen() only creates the generator; the body runs up to the first yield on next(g). "middle" never prints because next is called once.
+        hint: Does calling gen() run any of its body?
+
+      - id: python.iterators-async.mcq-gather-time
+        type: mcq
+        prompt: "How long does asyncio.run(main()) take?"
+        code: |
+          import asyncio
+          async def job():
+              await asyncio.sleep(1)
+          async def main():
+              await asyncio.gather(job(), job(), job())
+        options:
+          - text: About 1 second
+            correct: true
+            explanation: gather schedules the three coroutines concurrently; their sleeps overlap.
+          - text: About 3 seconds
+            misconception: gather-sequential
+            explanation: That is what `await job()` three times in a row would take.
+          - text: It finishes instantly because nothing is awaited
+            misconception: gather-not-awaited
+            explanation: main awaits gather, which waits for all three.
+        explanation: Concurrency in asyncio comes from tasks yielding at await points.
+        hint: Do the sleeps overlap?
+
+      - id: python.iterators-async.bug-blocking-call
+        type: bug
+        prompt: This takes 3 seconds instead of 1. Which line is wrong?
+        code: |
+          import asyncio, time
+          async def fetch(i):
+              time.sleep(1)
+              return i
+          async def main():
+              return await asyncio.gather(*(fetch(i) for i in range(3)))
+          print(asyncio.run(main()))
+        bug_line: 3
+        explanation: time.sleep blocks the event loop thread, so the coroutines run one after another. Use await asyncio.sleep(1), or asyncio.to_thread for blocking work.
+        hint: Which call never yields to the event loop?
+
+      - id: python.iterators-async.code-generator-once
+        type: code
+        language: python
+        prompt: Print the sum of the first four squares, then the squares themselves as a list. Both lines must use the same values.
+        starter: |
+          def squares(n):
+              for i in range(n):
+                  yield i * i
+
+          nums = squares(4)
+          print(sum(nums))
+          print(list(nums))
+        solution: |
+          def squares(n):
+              for i in range(n):
+                  yield i * i
+
+          nums = list(squares(4))
+          print(sum(nums))
+          print(list(nums))
+        expected: |
+          14
+          [0, 1, 4, 9]
+        explanation: A generator is a one-shot iterator. sum() consumes it, so list() then gets nothing and prints []. Materialize it with list() once, or call squares(4) again, when you need the values twice.
+        hint: What is left in a generator after something has iterated over all of it?
+
+sections:
+  - id: python/core
+    title: Core Python
+    concepts: [python.basics, python.collections, python.functions]
+  - id: python/objects-async
+    title: Objects, iterators & async
+    concepts: [python.oop-typing, python.iterators-async]
